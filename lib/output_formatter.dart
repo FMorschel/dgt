@@ -7,27 +7,32 @@ class OutputFormatter {
   ///
   /// [branchInfoList] - List of BranchInfo objects to display
   /// [verbose] - Whether to show verbose output
+  /// [showGerrit] - Whether to display Gerrit hash and date columns
+  /// [showLocal] - Whether to display local hash and date columns
   static void displayBranchTable(
     List<BranchInfo> branchInfoList, {
     bool verbose = false,
+    bool showGerrit = true,
+    bool showLocal = true,
   }) {
     if (branchInfoList.isEmpty) {
       Terminal.info('No branches found.');
       return;
     }
 
-    // Define column headers and widths
-    final headers = <String>[
-      'Branch Name',
-      'Status',
-      'Local Hash',
-      'Local Date',
-      'Gerrit Hash',
-      'Gerrit Date',
-    ];
+    // Define column headers and widths based on what should be displayed
+    final headers = <String>['Branch Name', 'Status'];
+    final columnWidths = <int>[20, 15];
 
-    // Fixed column widths for better readability
-    final columnWidths = <int>[20, 15, 12, 17, 12, 17];
+    if (showLocal) {
+      headers.addAll(['Local Hash', 'Local Date']);
+      columnWidths.addAll([12, 17]);
+    }
+
+    if (showGerrit) {
+      headers.addAll(['Gerrit Hash', 'Gerrit Date']);
+      columnWidths.addAll([12, 17]);
+    }
 
     // Print header
     _printTableHeader(headers, columnWidths);
@@ -35,7 +40,7 @@ class OutputFormatter {
 
     // Print each branch as a row
     for (final branchInfo in branchInfoList) {
-      _printBranchRow(branchInfo, columnWidths);
+      _printBranchRow(branchInfo, columnWidths, showGerrit, showLocal);
     }
 
     // Print summary
@@ -77,35 +82,63 @@ class OutputFormatter {
   /// The highlighting logic helps users quickly identify:
   /// - Branches where local changes differ from what's uploaded to Gerrit
   /// - Branches that need to be re-uploaded or synced
-  static void _printBranchRow(BranchInfo branchInfo, List<int> columnWidths) {
+  static void _printBranchRow(
+    BranchInfo branchInfo,
+    List<int> columnWidths,
+    bool showGerrit,
+    bool showLocal,
+  ) {
     final status = branchInfo.getDisplayStatus();
 
     // Format the data
     final branchName = _padString(branchInfo.branchName, columnWidths[0]);
     final statusStr = _padString(status, columnWidths[1]);
-    final localHash = _padString(
-      _truncateHash(branchInfo.localHash),
-      columnWidths[2],
-    );
-    final localDate = _padString(
-      _formatDate(branchInfo.localDate),
-      columnWidths[3],
-    );
-    final gerritHashRaw = branchInfo.getGerritHash();
-    final gerritHash = _padString(
-      _truncateHash(gerritHashRaw),
-      columnWidths[4],
-    );
-    final gerritDateRaw = branchInfo.getGerritDate();
-    final gerritDate = _padString(_formatDate(gerritDateRaw), columnWidths[5]);
+
+    // Track column index as we build the row
+    var colIndex = 2;
+
+    String? localHash;
+    String? localDate;
+    if (showLocal) {
+      localHash = _padString(
+        _truncateHash(branchInfo.localHash),
+        columnWidths[colIndex],
+      );
+      localDate = _padString(
+        _formatDate(branchInfo.localDate),
+        columnWidths[colIndex + 1],
+      );
+      colIndex += 2;
+    }
+
+    String? gerritHash;
+    String? gerritDate;
+    var gerritHashRaw = '-';
+    var gerritDateRaw = '-';
+    if (showGerrit) {
+      gerritHashRaw = branchInfo.getGerritHash();
+      gerritHash = _padString(
+        _truncateHash(gerritHashRaw),
+        columnWidths[colIndex],
+      );
+      gerritDateRaw = branchInfo.getGerritDate();
+      gerritDate = _padString(
+        _formatDate(gerritDateRaw),
+        columnWidths[colIndex + 1],
+      );
+    }
 
     // Check if Gerrit hash/date differ from local values
     // This indicates that the local branch has changes not yet uploaded,
     // or the Gerrit change has been updated since the last sync
     final hashDiffers =
+        showLocal &&
+        showGerrit &&
         gerritHashRaw != '-' &&
         _truncateHash(branchInfo.localHash) != _truncateHash(gerritHashRaw);
     final dateDiffers =
+        showLocal &&
+        showGerrit &&
         gerritDateRaw != '-' &&
         _formatDate(branchInfo.localDate) != _formatDate(gerritDateRaw);
 
@@ -120,6 +153,8 @@ class OutputFormatter {
       status,
       hashDiffers,
       dateDiffers,
+      showLocal,
+      showGerrit,
     );
   }
 
@@ -138,43 +173,50 @@ class OutputFormatter {
   static void _printRowWithHighlighting(
     String branchName,
     String statusStr,
-    String localHash,
-    String localDate,
-    String gerritHash,
-    String gerritDate,
+    String? localHash,
+    String? localDate,
+    String? gerritHash,
+    String? gerritDate,
     String status,
     bool hashDiffers,
     bool dateDiffers,
+    bool showLocal,
+    bool showGerrit,
   ) {
     // Get the appropriate color function for the status
     var colorText = _getStatusColorTextFunction(status);
 
     // Build the row parts with appropriate coloring
-    final beforeGerritHash =
-        '$branchName | $statusStr | $localHash | $localDate | ';
-    final separator = ' | ';
-
-    // Build the complete row with mixed colors
     final rowParts = <String>[];
 
-    // First part (before Gerrit hash) - use status color
-    rowParts.add(colorText(beforeGerritHash));
+    // First part - branch name and status (always shown)
+    rowParts.add(colorText('$branchName | $statusStr'));
 
-    // Gerrit hash - highlight in yellow if different from local
-    if (hashDiffers) {
-      rowParts.add(Terminal.yellowText(gerritHash));
-    } else {
-      rowParts.add(colorText(gerritHash));
+    // Add local hash and date if requested
+    if (showLocal && localHash != null && localDate != null) {
+      rowParts.add(colorText(' | $localHash | $localDate'));
     }
 
-    // Separator - use status color
-    rowParts.add(colorText(separator));
+    // Add Gerrit hash and date if requested
+    if (showGerrit && gerritHash != null && gerritDate != null) {
+      rowParts.add(colorText(' | '));
 
-    // Gerrit date - highlight in yellow if different from local
-    if (dateDiffers) {
-      rowParts.add(Terminal.yellowText(gerritDate));
-    } else {
-      rowParts.add(colorText(gerritDate));
+      // Gerrit hash - highlight in yellow if different from local
+      if (hashDiffers) {
+        rowParts.add(Terminal.yellowText(gerritHash));
+      } else {
+        rowParts.add(colorText(gerritHash));
+      }
+
+      // Separator
+      rowParts.add(colorText(' | '));
+
+      // Gerrit date - highlight in yellow if different from local
+      if (dateDiffers) {
+        rowParts.add(Terminal.yellowText(gerritDate));
+      } else {
+        rowParts.add(colorText(gerritDate));
+      }
     }
 
     // Print the combined row with all color segments
