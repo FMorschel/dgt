@@ -2,6 +2,8 @@ import 'dart:io';
 
 import 'package:args/args.dart';
 import 'package:dgt/branch_info.dart';
+import 'package:dgt/config_command.dart';
+import 'package:dgt/config_service.dart';
 import 'package:dgt/gerrit_service.dart';
 import 'package:dgt/git_service.dart';
 import 'package:dgt/output_formatter.dart';
@@ -53,7 +55,10 @@ void printUsage(ArgParser argParser) {
   Terminal.info('');
   Terminal.info('Commands:');
   Terminal.info(
-    '  list    List all local branches with Gerrit status (default)',
+    '  list      List all local branches with Gerrit status (default)',
+  );
+  Terminal.info(
+    '  config    Set default configuration options in ~/.dgt/.config',
   );
   Terminal.info('');
   Terminal.info('Options:');
@@ -75,6 +80,24 @@ void printUsage(ArgParser argParser) {
   );
   Terminal.info(
     '  dgt --no-local                         # Hide local hash and date columns',
+  );
+  Terminal.info('');
+  Terminal.info('Config command examples:');
+  Terminal.info(
+    '  dgt config --no-gerrit                 # Set default to hide Gerrit columns',
+  );
+  Terminal.info(
+    '  dgt config --no-local                  # Set default to hide local columns',
+  );
+  Terminal.info(
+    '  dgt config --gerrit --local            # Set default to show both columns',
+  );
+  Terminal.info(
+    '  dgt config --no-gerrit --no-local      # Set default to hide both columns',
+  );
+  Terminal.info('');
+  Terminal.info(
+    'Note: The config command requires at least one --local or --gerrit flag.',
   );
 }
 
@@ -314,9 +337,51 @@ Future<void> main(List<String> arguments) async {
     // Get the repository path if specified
     final repositoryPath = results.option('path');
 
-    // Get display options
-    final showGerrit = results.flag('gerrit');
-    final showLocal = results.flag('local');
+    // Load config from ~/.dgt/.config
+    final config = await ConfigService.readConfig(verbose: verbose);
+
+    // Determine display options with priority:
+    // 1. Command-line flags (if explicitly set)
+    // 2. Config file settings (if available)
+    // 3. Default values (true for both)
+    bool showGerrit;
+    bool showLocal;
+
+    // Check if flags were explicitly provided by the user
+    final gerritWasParsed = results.wasParsed('gerrit');
+    final localWasParsed = results.wasParsed('local');
+
+    if (gerritWasParsed) {
+      // Command-line flag takes priority
+      showGerrit = results.flag('gerrit');
+    } else if (config?.showGerrit != null) {
+      // Config file overrides default
+      showGerrit = config!.showGerrit!;
+    } else {
+      // Use default value
+      showGerrit = true;
+    }
+
+    if (localWasParsed) {
+      // Command-line flag takes priority
+      showLocal = results.flag('local');
+    } else if (config?.showLocal != null) {
+      // Config file overrides default
+      showLocal = config!.showLocal!;
+    } else {
+      // Use default value
+      showLocal = true;
+    }
+
+    if (verbose && config != null) {
+      Terminal.info('[VERBOSE] Using config file settings:');
+      if (config.showLocal != null) {
+        Terminal.info('[VERBOSE]   local: ${config.showLocal}');
+      }
+      if (config.showGerrit != null) {
+        Terminal.info('[VERBOSE]   gerrit: ${config.showGerrit}');
+      }
+    }
 
     // Determine which command to run
     final command = results.rest.isNotEmpty ? results.rest.first : 'list';
@@ -325,6 +390,28 @@ Future<void> main(List<String> arguments) async {
     switch (command) {
       case 'list':
         await runListCommand(verbose, repositoryPath, showGerrit, showLocal);
+      case 'config':
+        // For the config command, user must explicitly provide flags
+        if (!results.wasParsed('gerrit') && !results.wasParsed('local')) {
+          Terminal.error(
+            'Error: You must specify at least one flag for the config command.',
+          );
+          Terminal.info('');
+          Terminal.info('Example: dgt config --no-gerrit --local');
+          Terminal.info(
+            'Use --gerrit/--no-gerrit and/or --local/--no-local to set defaults.',
+          );
+          return;
+        }
+
+        // Only save values that were explicitly provided
+        final configShowGerrit = results.wasParsed('gerrit')
+            ? results.flag('gerrit')
+            : null;
+        final configShowLocal = results.wasParsed('local')
+            ? results.flag('local')
+            : null;
+        await runConfigCommand(verbose, configShowGerrit, configShowLocal);
       default:
         Terminal.error('Unknown command: $command');
         Terminal.info('');
