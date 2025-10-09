@@ -29,6 +29,18 @@ ArgParser buildParser() {
       abbr: 'p',
       help: 'Path to the Git repository to analyze.',
       valueHelp: 'path',
+    )
+    ..addFlag(
+      'gerrit',
+      defaultsTo: true,
+      negatable: true,
+      help: 'Display Gerrit hash and date columns.',
+    )
+    ..addFlag(
+      'local',
+      defaultsTo: true,
+      negatable: true,
+      help: 'Display local hash and date columns.',
     );
 }
 
@@ -58,9 +70,20 @@ void printUsage(ArgParser argParser) {
     '  dgt --path D:\\repo                     # List branches in specific repository',
   );
   Terminal.info('  dgt -v -p /path/to/repo                # Combined options');
+  Terminal.info(
+    '  dgt --no-gerrit                        # Hide Gerrit hash and date columns',
+  );
+  Terminal.info(
+    '  dgt --no-local                         # Hide local hash and date columns',
+  );
 }
 
-Future<void> runListCommand(bool verbose, String? repositoryPath) async {
+Future<void> runListCommand(
+  bool verbose,
+  String? repositoryPath,
+  bool showGerrit,
+  bool showLocal,
+) async {
   try {
     // Change to the specified repository path if provided
     if (repositoryPath != null) {
@@ -256,7 +279,12 @@ Future<void> runListCommand(bool verbose, String? repositoryPath) async {
 
     // Display results in a formatted table
     Terminal.info('');
-    OutputFormatter.displayBranchTable(branchInfoList, verbose: verbose);
+    OutputFormatter.displayBranchTable(
+      branchInfoList,
+      verbose: verbose,
+      showGerrit: showGerrit,
+      showLocal: showLocal,
+    );
   } catch (e) {
     Terminal.error('Error: $e');
     if (verbose) {
@@ -286,13 +314,17 @@ Future<void> main(List<String> arguments) async {
     // Get the repository path if specified
     final repositoryPath = results.option('path');
 
+    // Get display options
+    final showGerrit = results.flag('gerrit');
+    final showLocal = results.flag('local');
+
     // Determine which command to run
     final command = results.rest.isNotEmpty ? results.rest.first : 'list';
 
     // Execute the appropriate command
     switch (command) {
       case 'list':
-        await runListCommand(verbose, repositoryPath);
+        await runListCommand(verbose, repositoryPath, showGerrit, showLocal);
       default:
         Terminal.error('Unknown command: $command');
         Terminal.info('');
