@@ -127,6 +127,16 @@ class GerritService {
     return '$server/changes/$issueNumber/?o=CURRENT_REVISION';
   }
 
+  /// Constructs the Gerrit API URL for fetching mergeable info for a change.
+  ///
+  /// [issueNumber] - The Gerrit issue/change number (e.g., "389423")
+  /// [serverUrl] - The Gerrit server URL (defaults to dart-review.googlesource.com)
+  /// Returns the full API URL for the mergeable endpoint.
+  static String buildMergeableUrl(String issueNumber, [String? serverUrl]) {
+    final server = serverUrl ?? baseUrl;
+    return '$server/changes/$issueNumber/revisions/current/mergeable';
+  }
+
   /// Queries the Gerrit API for a change by its issue number.
   ///
   /// This is the preferred method for querying Gerrit when you have the issue number
@@ -345,6 +355,69 @@ class GerritService {
               if (changeNumber != null && results.containsKey(changeNumber)) {
                 results[changeNumber] = change;
               }
+            }
+          }
+        }
+
+        // Fetch mergeable data for all found changes in parallel
+        final mergeableFutures = <String, Future<bool>>{};
+        for (final entry in results.entries) {
+          if (entry.value != null) {
+            final issueNumber = entry.key;
+            final mergeableUrl =
+                '$serverUrl/changes/$issueNumber/revisions/current/mergeable';
+
+            mergeableFutures[issueNumber] = Future(() async {
+              try {
+                final mergeableResponse = await http.get(
+                  Uri.parse(mergeableUrl),
+                );
+
+                if (mergeableResponse.statusCode == 200) {
+                  var mergeableBody = mergeableResponse.body;
+                  if (mergeableBody.startsWith(xssiPrefix)) {
+                    mergeableBody = mergeableBody.substring(xssiPrefix.length);
+                  }
+
+                  final mergeableData = jsonDecode(mergeableBody);
+                  if (mergeableData is Map<String, dynamic>) {
+                    return mergeableData['mergeable'] as bool? ?? true;
+                  }
+                }
+                return true; // Default to true if fetch fails
+              } catch (e) {
+                return true; // Default to true if error occurs
+              }
+            });
+          }
+        }
+
+        // Wait for all mergeable requests to complete
+        if (mergeableFutures.isNotEmpty) {
+          final mergeableResults = await Future.wait(
+            mergeableFutures.entries.map((entry) async {
+              final issueNumber = entry.key;
+              final mergeable = await entry.value;
+              return MapEntry(issueNumber, mergeable);
+            }),
+          );
+
+          // Update the GerritChange objects with the correct mergeable status
+          for (final mergeableEntry in mergeableResults) {
+            final issueNumber = mergeableEntry.key;
+            final mergeable = mergeableEntry.value;
+            final existingChange = results[issueNumber];
+
+            if (existingChange != null) {
+              // Create a new GerritChange with the updated mergeable value
+              results[issueNumber] = GerritChange(
+                changeId: existingChange.changeId,
+                status: existingChange.status,
+                workInProgress: existingChange.workInProgress,
+                mergeable: mergeable,
+                updated: existingChange.updated,
+                currentRevision: existingChange.currentRevision,
+              );
             }
           }
         }
