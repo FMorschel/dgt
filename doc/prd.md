@@ -126,6 +126,10 @@ dgt --help
 
 # Version
 dgt --version
+
+# Enable timing summary
+dgt --timing
+dgt -t
 ```
 
 ### Output Format
@@ -138,6 +142,17 @@ feature/new-api      | Active         | I8473b95934b57...  | e4f5g6h     | 2025-
 bugfix/memory-leak   | Merged         | I9584c06e45d28...  | i7j8k9l     | 2025-09-28 16:45 | m1n2o3p     | 2025-09-30 11:00
 wip/experimental     | WIP            | I7395d17f32e19...  | q4r5s6t     | 2025-10-05 13:22 | q4r5s6t     | 2025-10-05 13:25
 hotfix/critical      | Merge conflict | I6284a29c41b37...  | u7v8w9x     | 2025-10-01 10:00 | y0z1a2b     | 2025-10-01 10:05
+```
+
+**Optional Timing Summary** (with `--timing` flag):
+
+```
+Performance Summary:
+  Branch discovery:        45ms
+  Git operations:         320ms
+  Gerrit API queries:     890ms
+  Result processing:       28ms
+  Total execution time:  1283ms
 ```
 
 **Color Coding**: Status indicators are color-coded for visual clarity:
@@ -239,6 +254,29 @@ Remote changes exist when: gerritsquashhash ≠ gerrit_current_revision
 - Users have Gerrit Change-IDs in their commit messages
 - Local branches correspond to Gerrit changes
 - Public repository access (no authentication required)
+
+## Optional Features
+
+### Performance Timing Summary
+
+**Description**: Display a breakdown of execution time for different operations.
+
+**Flag**: `--timing` or `-t`
+
+**Output**: After the branch table, display:
+
+- Time spent discovering branches
+- Time spent executing Git operations
+- Time spent querying Gerrit API
+- Time spent processing results
+- Total execution time
+
+**Purpose**: Help users and developers:
+
+- Identify performance bottlenecks
+- Understand where time is spent
+- Debug slow operations
+- Optimize workflows
 
 ## Future Enhancements
 

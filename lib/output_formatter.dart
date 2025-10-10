@@ -1,4 +1,5 @@
 import 'branch_info.dart';
+import 'performance_tracker.dart';
 import 'terminal.dart';
 
 /// Handles formatting and displaying branch information in a table format.
@@ -356,5 +357,49 @@ class OutputFormatter {
     }
 
     return dateStr;
+  }
+
+  /// Displays a performance summary showing timing breakdown of operations.
+  ///
+  /// [tracker] - The PerformanceTracker instance containing timing data
+  static void displayPerformanceSummary(PerformanceTracker tracker) {
+    if (!tracker.hasTimings) {
+      return;
+    }
+
+    Terminal.info('');
+    Terminal.info('Performance Summary:');
+
+    final timings = tracker.getTimings();
+    final totalTime = tracker.getTotalTime();
+
+    // Define the order and display names for operations
+    final operationOrder = [
+      ('branch_discovery', 'Branch discovery'),
+      ('git_operations', 'Git operations'),
+      ('gerrit_queries', 'Gerrit API queries'),
+      ('result_processing', 'Result processing'),
+    ];
+
+    // Find the longest operation name for alignment
+    var maxNameLength = 0;
+    for (final (_, displayName) in operationOrder) {
+      if (displayName.length > maxNameLength) {
+        maxNameLength = displayName.length;
+      }
+    }
+
+    // Display each operation timing
+    for (final (operationKey, displayName) in operationOrder) {
+      final duration = timings[operationKey];
+      if (duration != null) {
+        final paddedName = displayName.padRight(maxNameLength);
+        Terminal.info('  $paddedName: ${duration.toString().padLeft(5)}ms');
+      }
+    }
+
+    // Display total time
+    final paddedTotal = 'Total execution time'.padRight(maxNameLength);
+    Terminal.info('  $paddedTotal: ${totalTime.toString().padLeft(5)}ms');
   }
 }
