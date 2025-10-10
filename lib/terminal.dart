@@ -63,7 +63,7 @@ class Terminal {
     print(text);
   }
 
-  // ========== Color string methods (return colored strings without printing) ==========
+  // ==== Color string methods (return colored strings without printing) ====
 
   /// Returns a string colored in green.
   static String greenText(String text) {

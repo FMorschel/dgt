@@ -113,7 +113,8 @@ class GitService {
 
   /// Gets the name of the current branch.
   ///
-  /// Returns the current branch name or throws an exception if not in a Git repo.
+  /// Returns the current branch name or throws an exception if not in a Git
+  /// repo.
   static Future<String> getCurrentBranch() async {
     return await _runGitCommand(<String>['branch', '--show-current']);
   }
@@ -156,7 +157,8 @@ class GitService {
   /// Gets the Change-ID for a given branch by reading its commit message.
   ///
   /// [branch] - The branch name to get the Change-ID for.
-  /// [commitMessage] - Optional pre-fetched commit message to avoid redundant Git calls.
+  /// [commitMessage] - Optional pre-fetched commit message to avoid redundant
+  /// Git calls.
   /// Returns the Change-ID or null if not found in the commit message.
   static Future<String?> getChangeId(
     String branch, {
@@ -180,9 +182,10 @@ class GitService {
 
   /// Gets Gerrit configuration for a specific branch from Git config.
   ///
-  /// Reads branch-specific Gerrit metadata that is stored in the Git config file
-  /// when changes are uploaded to Gerrit. This metadata includes the change number,
-  /// server URL, patchset number, and various hashes used for tracking.
+  /// Reads branch-specific Gerrit metadata that is stored in the Git config
+  /// file when changes are uploaded to Gerrit. This metadata includes the
+  /// change number, server URL, patchset number, and various hashes used for
+  /// tracking.
   ///
   /// The Git config stores these values in the format:
   /// ```

@@ -13,6 +13,7 @@ linter:
     - avoid_void_async
     - await_only_futures
     - discarded_futures
+    - lines_longer_than_80_chars
     - no_literal_bool_comparisons
     - noop_primitive_operations
     - omit_local_variable_types

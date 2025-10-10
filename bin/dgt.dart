@@ -66,34 +66,42 @@ void printUsage(ArgParser argParser) {
   Terminal.info('');
   Terminal.info('Examples:');
   Terminal.info(
-    '  dgt                                    # List branches in current directory',
+    '  dgt                                    # List branches in current '
+    'directory',
   );
   Terminal.info(
     '  dgt --verbose                          # List with verbose output',
   );
   Terminal.info(
-    '  dgt --path D:\\repo                     # List branches in specific repository',
+    '  dgt --path D:\\repo                     # List branches in specific '
+    'repository',
   );
   Terminal.info('  dgt -v -p /path/to/repo                # Combined options');
   Terminal.info(
-    '  dgt --no-gerrit                        # Hide Gerrit hash and date columns',
+    '  dgt --no-gerrit                        # Hide Gerrit hash and date '
+    'columns',
   );
   Terminal.info(
-    '  dgt --no-local                         # Hide local hash and date columns',
+    '  dgt --no-local                         # Hide local hash and date '
+    'columns',
   );
   Terminal.info('');
   Terminal.info('Config command examples:');
   Terminal.info(
-    '  dgt config --no-gerrit                 # Set default to hide Gerrit columns',
+    '  dgt config --no-gerrit                 # Set default to hide Gerrit '
+    'columns',
   );
   Terminal.info(
-    '  dgt config --no-local                  # Set default to hide local columns',
+    '  dgt config --no-local                  # Set default to hide local '
+    'columns',
   );
   Terminal.info(
-    '  dgt config --gerrit --local            # Set default to show both columns',
+    '  dgt config --gerrit --local            # Set default to show both '
+    'columns',
   );
   Terminal.info(
-    '  dgt config --no-gerrit --no-local      # Set default to hide both columns',
+    '  dgt config --no-gerrit --no-local      # Set default to hide both '
+    'columns',
   );
   Terminal.info('');
   Terminal.info(
@@ -149,9 +157,10 @@ Future<void> runListCommand(
     final branchInfoList = <BranchInfo>[];
 
     // First pass: collect all branch info in parallel using Future.wait
-    // This significantly improves performance by running Git commands concurrently
-    // rather than sequentially. For a repo with N branches, this reduces execution
-    // time from N*T to approximately T (where T is the time for one Git operation).
+    // This significantly improves performance by running Git commands
+    // concurrently rather than sequentially. For a repo with N branches, this
+    // reduces execution time from N*T to approximately T (where T is the time
+    //for one Git operation).
     if (verbose) {
       Terminal.info(
         '[VERBOSE] Fetching Git information for all branches in parallel...',
@@ -217,7 +226,8 @@ Future<void> runListCommand(
             '[VERBOSE]   Gerrit Issue: ${branchData.gerritConfig.gerritIssue}',
           );
           Terminal.info(
-            '[VERBOSE]   Gerrit Server: ${branchData.gerritConfig.gerritServer}',
+            '[VERBOSE]   Gerrit Server: '
+            '${branchData.gerritConfig.gerritServer}',
           );
         }
 
@@ -242,7 +252,8 @@ Future<void> runListCommand(
     if (issueNumbersToBranches.isNotEmpty) {
       if (verbose) {
         Terminal.info(
-          '[VERBOSE] Batch querying Gerrit for ${issueNumbersToBranches.length} issue(s)...',
+          '[VERBOSE] Batch querying Gerrit for '
+          '${issueNumbersToBranches.length} issue(s)...',
         );
       }
 
@@ -283,7 +294,8 @@ Future<void> runListCommand(
 
         if (verbose && gerritChange != null) {
           Terminal.info(
-            '[VERBOSE] Branch ${branchData.branch}: Gerrit status = ${gerritChange.getUserFriendlyStatus()}',
+            '[VERBOSE] Branch ${branchData.branch}: Gerrit status = '
+            '${gerritChange.getUserFriendlyStatus()}',
           );
         }
       }
