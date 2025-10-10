@@ -224,6 +224,61 @@ This plan outlines the steps to build a Minimum Viable Product (MVP) for DGT - a
   - Call `OutputFormatter.displayPerformanceSummary()` at the end
 - [x] Update documentation with timing flag examples
 
+### Phase 13: Filtering
+
+- [x] Add filtering CLI flags to `bin/dgt.dart`:
+  - `--status <status>` to filter by status (can be specified multiple times for multiple statuses)
+  - `--since <date>` to filter branches by commit date (show only branches with commits after this date)
+  - `--before <date>` to filter branches by commit date (show only branches with commits before this date)
+  - `--diverged` to show only branches with local or remote differences
+- [x] Validate filter input values and provide helpful error messages for invalid inputs
+- [x] Add computed property `diverged` to `BranchInfo`: returns true when `hasLocalChanges() || hasRemoteChanges()`
+- [x] Implement filtering logic:
+  - Create `applyFilters(List<BranchInfo> branches, FilterOptions filters)` function
+  - Apply status filter(s) first, then date filters, then `--diverged` filter
+  - Ensure filters are chainable and performant
+- [x] Integrate filtering into the output pipeline before formatting
+- [x] Extend `ConfigService` to save/load filter defaults (status, date ranges, diverged flag)
+- [x] Extend `config` command to support filter options:
+  - `dgt config --status Active --diverged` (save filter defaults)
+  - `dgt config --no-status --no-diverged` (clear specific filter defaults)
+  - Load saved filter configuration automatically on each run (unless overridden by CLI flags)
+  - CLI flags always take precedence over config defaults
+- [x] Update `--help` text with filtering examples:
+  - `dgt --status Active --since 2025-10-01`
+  - `dgt --diverged`
+  - `dgt --status WIP --status Active --before 2025-10-10`
+  - `dgt config --status Active --diverged` (save as default)
+- [x] Update `README.md` with filtering usage examples
+
+### Phase 14: Sorting
+
+- [ ] Add sorting CLI flags to `bin/dgt.dart`:
+  - `--sort <field>` where `<field>` is one of: `local-date`, `gerrit-date`, `status`, `divergences`, `name`
+  - `--asc` to sort in ascending order (default if `--sort` is used without direction)
+  - `--desc` to sort in descending order
+- [ ] Validate sort field input and provide helpful error messages for invalid values
+- [ ] Ensure `BranchInfo` exposes fields needed for sorting: `localDate`, `gerritDate`, `status`, `name`
+- [ ] Implement sorting logic:
+  - Create `applySort(List<BranchInfo> branches, SortOptions sortOptions)` function
+  - Provide stable sorting using `List.sort()` with comparator functions for each field
+  - For `divergences` sort, compute a score: 2 = both diverged, 1 = one side diverged, 0 = in sync
+- [ ] Integrate sorting into the output pipeline (after filtering, before formatting)
+- [ ] Add sorting indicator in output header when `--sort` is used (e.g., `Sorted by: status (desc)`)
+- [ ] Extend `ConfigService` to save/load sort defaults (field and direction)
+- [ ] Extend `config` command to support sort options:
+  - `dgt config --sort local-date --desc` (save sort defaults)
+  - `dgt config --no-sort` (clear sort defaults)
+  - Load saved sort configuration automatically on each run (unless overridden by CLI flags)
+  - CLI flags always take precedence over config defaults
+- [ ] Update `--help` text with sorting examples:
+  - `dgt --sort local-date --desc`
+  - `dgt --sort status`
+  - `dgt --status Active --sort divergences --desc`
+  - `dgt config --sort local-date --asc` (save as default)
+  - `dgt config --no-sort` (clear saved sort)
+- [ ] Update `README.md` with sorting usage examples
+
 ---
 
 ## MVP Scope Exclusions

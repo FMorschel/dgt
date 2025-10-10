@@ -6,6 +6,10 @@ Future<void> runConfigCommand(
   bool verbose,
   bool? showGerrit,
   bool? showLocal,
+  List<String>? filterStatuses,
+  String? filterSince,
+  String? filterBefore,
+  bool? filterDiverged,
 ) async {
   try {
     // Read existing config first
@@ -16,6 +20,10 @@ Future<void> runConfigCommand(
     final config = DgtConfig(
       showGerrit: showGerrit ?? existingConfig?.showGerrit,
       showLocal: showLocal ?? existingConfig?.showLocal,
+      filterStatuses: filterStatuses ?? existingConfig?.filterStatuses,
+      filterSince: filterSince ?? existingConfig?.filterSince,
+      filterBefore: filterBefore ?? existingConfig?.filterBefore,
+      filterDiverged: filterDiverged ?? existingConfig?.filterDiverged,
     );
 
     // Write config to file
@@ -31,11 +39,23 @@ Future<void> runConfigCommand(
     if (config.showGerrit != null) {
       Terminal.info('  gerrit: ${config.showGerrit}');
     }
+    if (config.filterStatuses != null && config.filterStatuses!.isNotEmpty) {
+      Terminal.info('  filterStatuses: ${config.filterStatuses}');
+    }
+    if (config.filterSince != null) {
+      Terminal.info('  filterSince: ${config.filterSince}');
+    }
+    if (config.filterBefore != null) {
+      Terminal.info('  filterBefore: ${config.filterBefore}');
+    }
+    if (config.filterDiverged != null) {
+      Terminal.info('  filterDiverged: ${config.filterDiverged}');
+    }
     Terminal.info('');
     Terminal.info('These settings will be used as defaults for future runs.');
     Terminal.info(
-      'You can override them with command-line flags like --no-gerrit or '
-      '--no-local.',
+      'You can override them with command-line flags like --no-gerrit, '
+      '--no-local, --status, etc.',
     );
   } catch (e) {
     Terminal.error('Error saving configuration: $e');

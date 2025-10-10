@@ -34,6 +34,26 @@ This leads to inefficiency and potential oversight of important review status ch
 - **Primary**: Dart SDK contributors who use Gerrit for code reviews
 - **Secondary**: Any developer working with Gerrit-based workflows
 
+## Requirements
+
+The following requirements capture user requests and open issues identified for the project (recorded on 2025-10-10):
+
+1. Sort output
+
+   - Description: Users must be able to sort the tool's output by one or more fields to make scanning large lists easier.
+   - Acceptance criteria:
+     - Provide a CLI option to sort by: date (local or Gerrit), status, divergences (missing push/pull), and branch name.
+     - Support ascending and descending order.
+     - Sorting should be stable and performant for typical repositories.
+
+2. Filter output
+
+   - Description: Users must be able to filter the output to focus on branches of interest.
+   - Acceptance criteria:
+     - Provide CLI options to filter by status (WIP, Active, Merge conflict, Merged).
+     - Provide date-based filters: `--since <date>` and `--before <date>` to limit by last commit date.
+     - Filters may be combined (e.g., status + date range) and should be applied efficiently.
+
 ## Features
 
 ### Core Features

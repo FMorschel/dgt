@@ -379,6 +379,7 @@ class OutputFormatter {
       ('git_operations', 'Git operations'),
       ('gerrit_queries', 'Gerrit API queries'),
       ('result_processing', 'Result processing'),
+      ('filtering', 'Filtering'),
     ];
 
     // Find the longest operation name for alignment
