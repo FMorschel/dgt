@@ -10,6 +10,8 @@ class DgtConfig {
     this.filterSince,
     this.filterBefore,
     this.filterDiverged,
+    this.sortField,
+    this.sortDirection,
   });
 
   factory DgtConfig.fromJson(Map<String, dynamic> json) {
@@ -22,6 +24,8 @@ class DgtConfig {
       filterSince: json['filterSince'] as String?,
       filterBefore: json['filterBefore'] as String?,
       filterDiverged: json['filterDiverged'] as bool?,
+      sortField: json['sortField'] as String?,
+      sortDirection: json['sortDirection'] as String?,
     );
   }
 
@@ -31,6 +35,8 @@ class DgtConfig {
   final String? filterSince;
   final String? filterBefore;
   final bool? filterDiverged;
+  final String? sortField;
+  final String? sortDirection;
 
   Map<String, dynamic> toJson() {
     return {
@@ -41,6 +47,8 @@ class DgtConfig {
       if (filterSince != null) 'filterSince': filterSince,
       if (filterBefore != null) 'filterBefore': filterBefore,
       if (filterDiverged != null) 'filterDiverged': filterDiverged,
+      if (sortField != null) 'sortField': sortField,
+      if (sortDirection != null) 'sortDirection': sortDirection,
     };
   }
 }
@@ -90,6 +98,12 @@ class ConfigService {
         }
         if (config.filterDiverged != null) {
           print('[VERBOSE]   filterDiverged: ${config.filterDiverged}');
+        }
+        if (config.sortField != null) {
+          print('[VERBOSE]   sortField: ${config.sortField}');
+        }
+        if (config.sortDirection != null) {
+          print('[VERBOSE]   sortDirection: ${config.sortDirection}');
         }
       }
 

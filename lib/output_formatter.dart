@@ -10,15 +10,26 @@ class OutputFormatter {
   /// [verbose] - Whether to show verbose output
   /// [showGerrit] - Whether to display Gerrit hash and date columns
   /// [showLocal] - Whether to display local hash and date columns
+  /// [sortField] - The field used for sorting (if any)
+  /// [sortDirection] - The direction used for sorting (if any)
   static void displayBranchTable(
     List<BranchInfo> branchInfoList, {
     bool verbose = false,
     bool showGerrit = true,
     bool showLocal = true,
+    String? sortField,
+    String? sortDirection,
   }) {
     if (branchInfoList.isEmpty) {
       Terminal.info('No branches found.');
       return;
+    }
+
+    // Display sorting indicator if sorting is active
+    if (sortField != null && sortField.isNotEmpty) {
+      final direction = sortDirection ?? 'asc';
+      Terminal.info('Sorted by: $sortField ($direction)');
+      Terminal.info('');
     }
 
     // Define column headers and widths based on what should be displayed
@@ -380,6 +391,7 @@ class OutputFormatter {
       ('gerrit_queries', 'Gerrit API queries'),
       ('result_processing', 'Result processing'),
       ('filtering', 'Filtering'),
+      ('sorting', 'Sorting'),
     ];
 
     // Find the longest operation name for alignment

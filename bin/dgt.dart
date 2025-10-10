@@ -10,6 +10,7 @@ import 'package:dgt/git_service.dart';
 import 'package:dgt/git_service_batch.dart';
 import 'package:dgt/output_formatter.dart';
 import 'package:dgt/performance_tracker.dart';
+import 'package:dgt/sorting.dart';
 import 'package:dgt/terminal.dart';
 
 const String version = '0.0.1';
@@ -75,7 +76,26 @@ ArgParser buildParser() {
       'diverged',
       negatable: true,
       help: 'Filter to show only branches with local or remote differences.',
-    );
+    )
+    ..addOption(
+      'sort',
+      help:
+          'Sort branches by field. '
+          'Allowed: local-date, gerrit-date, status, divergences, name',
+      allowed: ['local-date', 'gerrit-date', 'status', 'divergences', 'name'],
+      valueHelp: 'field',
+    )
+    ..addFlag(
+      'no-sort',
+      negatable: false,
+      help: 'Clear sorting configuration (config command only).',
+    )
+    ..addFlag(
+      'asc',
+      negatable: false,
+      help: 'Sort in ascending order (default when --sort is used).',
+    )
+    ..addFlag('desc', negatable: false, help: 'Sort in descending order.');
 }
 
 void printUsage(ArgParser argParser) {
@@ -148,6 +168,33 @@ void printUsage(ArgParser argParser) {
     'have diverged',
   );
   Terminal.info('');
+  Terminal.info('Sorting examples:');
+  Terminal.info(
+    '  dgt --sort local-date --desc           # Sort by local date, newest '
+    'first',
+  );
+  Terminal.info(
+    '  dgt --sort status                      # Sort by status (ascending)',
+  );
+  Terminal.info(
+    '  dgt --sort divergences --desc          # Sort by divergences, most '
+    'diverged first',
+  );
+  Terminal.info(
+    '  dgt --sort name --asc                  # Sort by branch name '
+    'alphabetically',
+  );
+  Terminal.info(
+    '  dgt --status active --sort local-date  # Combine filtering and sorting',
+  );
+  Terminal.info('');
+  Terminal.info('Available sort fields:');
+  Terminal.info('  local-date    - Local commit date');
+  Terminal.info('  gerrit-date   - Gerrit update date');
+  Terminal.info('  status        - Gerrit status');
+  Terminal.info('  divergences   - Divergence state');
+  Terminal.info('  name          - Branch name');
+  Terminal.info('');
   Terminal.info('Available status values:');
   Terminal.info('  wip       - Work in Progress');
   Terminal.info('  active    - Ready for review');
@@ -171,9 +218,18 @@ void printUsage(ArgParser argParser) {
     '  dgt config --no-gerrit --no-local      # Set default to hide both '
     'columns',
   );
+  Terminal.info(
+    '  dgt config --status active --diverged  # Set default filters',
+  );
+  Terminal.info(
+    '  dgt config --sort local-date --desc    # Set default sort options',
+  );
+  Terminal.info(
+    '  dgt config --sort name                 # Set default sort by name',
+  );
   Terminal.info('');
   Terminal.info(
-    'Note: The config command requires at least one --local or --gerrit flag.',
+    'Note: The config command requires at least one flag to be set.',
   );
 }
 
@@ -184,6 +240,7 @@ Future<void> runListCommand(
   bool showLocal,
   bool showTiming,
   FilterOptions filters,
+  SortOptions sortOptions,
 ) async {
   // Initialize performance tracker if timing is requested
   PerformanceTracker? tracker;
@@ -430,6 +487,21 @@ Future<void> runListCommand(
       }
     }
 
+    // Apply sorting
+    if (!sortOptions.isEmpty) {
+      if (verbose) {
+        Terminal.info('[VERBOSE] Applying sorting...');
+        Terminal.info(
+          '[VERBOSE] Sort field: ${sortOptions.field}, '
+          'direction: ${sortOptions.direction ?? "asc"}',
+        );
+      }
+
+      tracker?.startTimer('sorting');
+      branchInfoList = applySort(branchInfoList, sortOptions);
+      tracker?.endTimer('sorting');
+    }
+
     // Display results in a formatted table
     Terminal.info('');
     OutputFormatter.displayBranchTable(
@@ -437,6 +509,8 @@ Future<void> runListCommand(
       verbose: verbose,
       showGerrit: showGerrit,
       showLocal: showLocal,
+      sortField: sortOptions.field,
+      sortDirection: sortOptions.direction,
     );
 
     // Display performance summary if timing was requested
@@ -529,6 +603,12 @@ Future<void> main(List<String> arguments) async {
       if (config.filterDiverged != null) {
         Terminal.info('[VERBOSE]   filterDiverged: ${config.filterDiverged}');
       }
+      if (config.sortField != null) {
+        Terminal.info('[VERBOSE]   sortField: ${config.sortField}');
+      }
+      if (config.sortDirection != null) {
+        Terminal.info('[VERBOSE]   sortDirection: ${config.sortDirection}');
+      }
     }
 
     // Parse filter options from CLI
@@ -539,6 +619,15 @@ Future<void> main(List<String> arguments) async {
         ? results.flag('diverged')
         : null;
 
+    // Parse sort options from CLI
+    final cliSortField = results.option('sort');
+    String? cliSortDirection;
+    if (results.wasParsed('desc')) {
+      cliSortDirection = 'desc';
+    } else if (results.wasParsed('asc')) {
+      cliSortDirection = 'asc';
+    }
+
     // Merge CLI filters with config defaults (CLI takes precedence)
     final statusFilters = cliStatusFilters.isNotEmpty
         ? cliStatusFilters
@@ -547,6 +636,10 @@ Future<void> main(List<String> arguments) async {
     final beforeStr = cliBeforeStr ?? config?.filterBefore;
     final divergedFilter = cliDivergedFilter ?? config?.filterDiverged;
 
+    // Merge CLI sort options with config defaults (CLI takes precedence)
+    final sortField = cliSortField ?? config?.sortField;
+    final sortDirection = cliSortDirection ?? config?.sortDirection;
+
     // Validate status filters (from CLI or config file)
     try {
       statusFilters.forEach(validateStatus);
@@ -554,6 +647,19 @@ Future<void> main(List<String> arguments) async {
       Terminal.error('$e');
       Terminal.info('');
       Terminal.info('Run "dgt --help" to see available status values.');
+      return;
+    }
+
+    // Validate sort field (from CLI or config file)
+    try {
+      if (sortField != null) {
+        validateSortField(sortField);
+      }
+      if (sortDirection != null) {
+        validateSortDirection(sortDirection);
+      }
+    } catch (e) {
+      Terminal.error('Error: $e');
       return;
     }
 
@@ -576,6 +682,8 @@ Future<void> main(List<String> arguments) async {
       diverged: divergedFilter,
     );
 
+    final sortOptions = SortOptions(field: sortField, direction: sortDirection);
+
     // Determine which command to run
     final command = results.rest.isNotEmpty ? results.rest.first : 'list';
 
@@ -589,6 +697,7 @@ Future<void> main(List<String> arguments) async {
           showLocal,
           showTiming,
           filters,
+          sortOptions,
         );
       case 'config':
         // For the config command, user must explicitly provide at least one
@@ -600,8 +709,13 @@ Future<void> main(List<String> arguments) async {
             results.wasParsed('since') ||
             results.wasParsed('before') ||
             results.wasParsed('diverged');
+        final hasSortFlags =
+            results.wasParsed('sort') ||
+            results.wasParsed('no-sort') ||
+            results.wasParsed('asc') ||
+            results.wasParsed('desc');
 
-        if (!hasDisplayFlags && !hasFilterFlags) {
+        if (!hasDisplayFlags && !hasFilterFlags && !hasSortFlags) {
           Terminal.error(
             'Error: You must specify at least one flag for the config command.',
           );
@@ -613,9 +727,13 @@ Future<void> main(List<String> arguments) async {
           Terminal.info('  dgt config --status Active --diverged');
           Terminal.info('  dgt config --since 2025-10-01');
           Terminal.info('');
+          Terminal.info('Sort options:');
+          Terminal.info('  dgt config --sort local-date --desc');
+          Terminal.info('');
           Terminal.info(
             'Use --gerrit/--no-gerrit, --local/--no-local, --status, '
-            '--since, --before, --diverged to set defaults.',
+            '--since, --before, --diverged, --sort, --asc, --desc to set '
+            'defaults.',
           );
           return;
         }
@@ -640,6 +758,23 @@ Future<void> main(List<String> arguments) async {
             ? results.flag('diverged')
             : null;
 
+        // Handle --no-sort flag (clears sort configuration)
+        String? configSortField;
+        String? configSortDirection;
+        if (results.wasParsed('no-sort') && results.flag('no-sort')) {
+          // User wants to clear sort configuration
+          configSortField = ''; // Empty string signals to clear
+          configSortDirection = '';
+        } else if (results.wasParsed('sort')) {
+          configSortField = results.option('sort');
+          // Only set direction if sort field is also set
+          if (results.wasParsed('desc')) {
+            configSortDirection = 'desc';
+          } else if (results.wasParsed('asc')) {
+            configSortDirection = 'asc';
+          }
+        }
+
         await runConfigCommand(
           verbose,
           configShowGerrit,
@@ -648,6 +783,8 @@ Future<void> main(List<String> arguments) async {
           configSince,
           configBefore,
           configDiverged,
+          configSortField,
+          configSortDirection,
         );
       default:
         Terminal.error('Unknown command: $command');
@@ -668,6 +805,16 @@ Future<void> main(List<String> arguments) async {
       Terminal.info('  conflict  - Has merge conflicts');
       Terminal.info('');
       Terminal.info('Run "dgt --help" for more information.');
+    } else if (e.message.contains('--sort')) {
+      Terminal.info('');
+      Terminal.info('Available sort fields:');
+      Terminal.info('  local-date   - Sort by local date');
+      Terminal.info('  gerrit-date  - Sort by Gerrit date');
+      Terminal.info('  status       - Sort by Gerrit status');
+      Terminal.info('  name         - Sort by branch name');
+      Terminal.info('');
+      Terminal.info('Run "dgt --help" for more information.');
+      Terminal.info('');
     } else {
       Terminal.info('');
       printUsage(argParser);
