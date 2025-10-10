@@ -6,6 +6,7 @@ import 'package:dgt/config_command.dart';
 import 'package:dgt/config_service.dart';
 import 'package:dgt/gerrit_service.dart';
 import 'package:dgt/git_service.dart';
+import 'package:dgt/git_service_batch.dart';
 import 'package:dgt/output_formatter.dart';
 import 'package:dgt/performance_tracker.dart';
 import 'package:dgt/terminal.dart';
@@ -179,59 +180,63 @@ Future<void> runListCommand(
     // Collect branch information
     final branchInfoList = <BranchInfo>[];
 
-    // First pass: collect all branch info in parallel using Future.wait
-    // This significantly improves performance by running Git commands
-    // concurrently rather than sequentially. For a repo with N branches, this
-    // reduces execution time from N*T to approximately T (where T is the time
-    //for one Git operation).
+    // Batch fetch all Git information at once to minimize git process spawns
+    // This uses git for-each-ref and git config --get-regexp to get data for
+    // all branches in just 2 git commands instead of 2*N commands.
     if (verbose) {
-      Terminal.info(
-        '[VERBOSE] Fetching Git information for all branches in parallel...',
-      );
+      Terminal.info('[VERBOSE] Batch fetching Git information for all branches...');
     }
 
     tracker?.startTimer('git_operations');
-    final branchFutures = branches.map((String branch) async {
-      if (verbose) {
-        Terminal.info('[VERBOSE] Processing branch: $branch');
-      }
-
-      try {
-        // Fetch all Git information for this branch in parallel
-        final results = await Future.wait(<Future<Object>>[
-          GitService.getCommitHash(branch),
-          GitService.getCommitDate(branch),
-          GitService.getGerritConfig(branch),
-        ]);
-
-        final localHash = results[0] as String;
-        final localDate = results[1] as String;
-        final gerritConfig = results[2] as GerritBranchConfig;
-
-        return (
+    
+    // Fetch commit info and Gerrit config for all branches in parallel
+    final results = await Future.wait([
+      GitServiceBatch.getBatchCommitInfo(branches),
+      GitServiceBatch.getBatchGerritConfig(branches),
+    ]);
+    
+    final commitInfoMap = results[0] as Map<String, ({String hash, String date})>;
+    final gerritConfigMap = results[1] as Map<String, GerritBranchConfig>;
+    
+    // Build branch data list
+    final branchDataList = <({
+      String branch,
+      String localHash,
+      String localDate,
+      GerritBranchConfig gerritConfig,
+      Object? error,
+    })>[];
+    
+    for (final branch in branches) {
+      final commitInfo = commitInfoMap[branch];
+      final gerritConfig = gerritConfigMap[branch] ?? GerritBranchConfig();
+      
+      if (commitInfo != null) {
+        if (verbose) {
+          Terminal.info('[VERBOSE] Processing branch: $branch');
+        }
+        
+        branchDataList.add((
           branch: branch,
-          localHash: localHash,
-          localDate: localDate,
+          localHash: commitInfo.hash,
+          localDate: commitInfo.date,
           gerritConfig: gerritConfig,
           error: null,
-        );
-      } catch (e) {
+        ));
+      } else {
         if (verbose) {
-          Terminal.warning('[VERBOSE] Failed to process branch $branch: $e');
+          Terminal.warning('[VERBOSE] Failed to get commit info for branch $branch');
         }
-        // Return error marker to handle gracefully
-        return (
+        branchDataList.add((
           branch: branch,
           localHash: '',
           localDate: '',
-          gerritConfig: GerritBranchConfig(),
-          error: e,
-        );
+          gerritConfig: gerritConfig,
+          error: 'Missing commit info',
+        ));
       }
-    });
-
-    // Wait for all branch data to be collected
-    final branchDataList = await Future.wait(branchFutures);
+    }
+    
     tracker?.endTimer('git_operations');
 
     // Build issue number mapping
