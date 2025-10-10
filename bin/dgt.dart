@@ -7,6 +7,7 @@ import 'package:dgt/config_service.dart';
 import 'package:dgt/gerrit_service.dart';
 import 'package:dgt/git_service.dart';
 import 'package:dgt/output_formatter.dart';
+import 'package:dgt/performance_tracker.dart';
 import 'package:dgt/terminal.dart';
 
 const String version = '0.0.1';
@@ -26,6 +27,12 @@ ArgParser buildParser() {
       help: 'Show additional command output.',
     )
     ..addFlag('version', negatable: false, help: 'Print the tool version.')
+    ..addFlag(
+      'timing',
+      abbr: 't',
+      negatable: false,
+      help: 'Display performance timing summary.',
+    )
     ..addOption(
       'path',
       abbr: 'p',
@@ -85,6 +92,13 @@ void printUsage(ArgParser argParser) {
     '  dgt --no-local                         # Hide local hash and date '
     'columns',
   );
+  Terminal.info(
+    '  dgt --timing                           # Display performance timing '
+    'summary',
+  );
+  Terminal.info(
+    '  dgt -v -t                              # Verbose output with timing',
+  );
   Terminal.info('');
   Terminal.info('Config command examples:');
   Terminal.info(
@@ -114,7 +128,14 @@ Future<void> runListCommand(
   String? repositoryPath,
   bool showGerrit,
   bool showLocal,
+  bool showTiming,
 ) async {
+  // Initialize performance tracker if timing is requested
+  PerformanceTracker? tracker;
+  if (showTiming) {
+    tracker = PerformanceTracker();
+  }
+
   try {
     // Change to the specified repository path if provided
     if (repositoryPath != null) {
@@ -142,7 +163,9 @@ Future<void> runListCommand(
     }
 
     // Get all local branches
+    tracker?.startTimer('branch_discovery');
     final branches = await GitService.getAllBranches();
+    tracker?.endTimer('branch_discovery');
 
     if (branches.isEmpty) {
       Terminal.info('No branches found in this repository.');
@@ -167,6 +190,7 @@ Future<void> runListCommand(
       );
     }
 
+    tracker?.startTimer('git_operations');
     final branchFutures = branches.map((String branch) async {
       if (verbose) {
         Terminal.info('[VERBOSE] Processing branch: $branch');
@@ -208,6 +232,7 @@ Future<void> runListCommand(
 
     // Wait for all branch data to be collected
     final branchDataList = await Future.wait(branchFutures);
+    tracker?.endTimer('git_operations');
 
     // Build issue number mapping
     final issueNumbersToBranches = <String, List<String>>{};
@@ -258,20 +283,24 @@ Future<void> runListCommand(
       }
 
       try {
+        tracker?.startTimer('gerrit_queries');
         final issueNumbers = issueNumbersToBranches.keys.toList();
         gerritChanges = await GerritService.getBatchChangesByIssueNumbers(
           issueNumbers,
         );
+        tracker?.endTimer('gerrit_queries');
 
         if (verbose) {
           final foundCount = gerritChanges.values
               .where((GerritChange? c) => c != null)
               .length;
           Terminal.info(
-            '[VERBOSE] Batch query completed: $foundCount/${issueNumbers.length} changes found',
+            '[VERBOSE] Batch query completed: $foundCount/'
+            '${issueNumbers.length} changes found',
           );
         }
       } catch (e) {
+        tracker?.endTimer('gerrit_queries');
         if (verbose) {
           Terminal.warning('[VERBOSE] Batch Gerrit query failed: $e');
         }
@@ -280,6 +309,7 @@ Future<void> runListCommand(
     }
 
     // Third pass: create BranchInfo objects with Gerrit data
+    tracker?.startTimer('result_processing');
     for (var branchData in branchDataList) {
       // Skip branches that had errors during Git operations
       if (branchData.error != null) {
@@ -311,6 +341,7 @@ Future<void> runListCommand(
 
       branchInfoList.add(branchInfo);
     }
+    tracker?.endTimer('result_processing');
 
     // Display results in a formatted table
     Terminal.info('');
@@ -320,6 +351,11 @@ Future<void> runListCommand(
       showGerrit: showGerrit,
       showLocal: showLocal,
     );
+
+    // Display performance summary if timing was requested
+    if (showTiming && tracker != null) {
+      OutputFormatter.displayPerformanceSummary(tracker);
+    }
   } catch (e) {
     Terminal.error('Error: $e');
     if (verbose) {
@@ -345,6 +381,7 @@ Future<void> main(List<String> arguments) async {
     }
 
     final verbose = results.flag('verbose');
+    final showTiming = results.flag('timing');
 
     // Get the repository path if specified
     final repositoryPath = results.option('path');
@@ -401,7 +438,13 @@ Future<void> main(List<String> arguments) async {
     // Execute the appropriate command
     switch (command) {
       case 'list':
-        await runListCommand(verbose, repositoryPath, showGerrit, showLocal);
+        await runListCommand(
+          verbose,
+          repositoryPath,
+          showGerrit,
+          showLocal,
+          showTiming,
+        );
       case 'config':
         // For the config command, user must explicitly provide flags
         if (!results.wasParsed('gerrit') && !results.wasParsed('local')) {

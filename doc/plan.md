@@ -181,11 +181,6 @@ This plan outlines the steps to build a Minimum Viable Product (MVP) for DGT - a
   - Yellow local hash and date = unpushed local changes exist
   - Yellow Gerrit hash and date = Gerrit has updates not in local branch
 - [x] Handle edge cases (missing config fields, null values)
-- [ ] Test with various scenarios:
-  - Fresh branch (no uploads yet)
-  - Branch with local commits after upload
-  - Branch where Gerrit has been rebased/amended
-  - Branch in sync (all hashes match)
 
 **Expected Behavior**:
 
@@ -202,6 +197,32 @@ This plan outlines the steps to build a Minimum Viable Product (MVP) for DGT - a
 - [x] Document Gerrit API endpoints used
 - [x] Document expected Git configuration
 - [x] Add example output to README.md
+
+### Phase 12: Performance Timing (Optional Feature)
+
+- [x] Add `--timing` / `-t` flag to CLI argument parser
+- [x] Create `lib/performance_tracker.dart` to track operation timings
+- [x] Implement `PerformanceTracker` class with methods:
+  - `startTimer(String operationName)` - Start timing an operation
+  - `endTimer(String operationName)` - End timing and record duration
+  - `getTimings()` - Return map of operation names to durations
+  - `getTotalTime()` - Return total execution time
+  - `reset()` - Clear all timings
+- [x] Track timings for key operations:
+  - Branch discovery (`GitService.getAllBranches()`)
+  - Git operations (parallel `Future.wait` for all branches)
+  - Gerrit API queries (`GerritService.getBatchChangesByIssueNumbers()`)
+  - Result processing (creating `BranchInfo` objects)
+- [x] Add timing summary output to `OutputFormatter`:
+  - `displayPerformanceSummary(PerformanceTracker tracker)` method
+  - Format: "Performance Summary:" header with breakdown
+  - Display each operation with aligned millisecond values
+  - Show total execution time
+- [x] Update `runListCommand()` to:
+  - Create `PerformanceTracker` instance when `--timing` flag is set
+  - Wrap key operations with start/end timer calls
+  - Call `OutputFormatter.displayPerformanceSummary()` at the end
+- [x] Update documentation with timing flag examples
 
 ---
 

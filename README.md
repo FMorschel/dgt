@@ -92,6 +92,34 @@ This shows:
 - Branch processing status
 - Query results and timing
 
+### Performance Timing
+
+Display a summary of execution time breakdown:
+
+```bash
+dart pub global run dgt --timing
+# or
+dart pub global run dgt -t
+```
+
+This shows a performance summary after the branch table:
+
+```
+Performance Summary:
+  Branch discovery:        45ms
+  Git operations:         320ms
+  Gerrit API queries:     890ms
+  Result processing:       28ms
+  Total execution time:  1283ms
+```
+
+You can combine with other flags:
+
+```bash
+dart pub global run dgt -v -t  # Verbose output with timing
+dart pub global run dgt -p /path/to/repo --timing  # Timing for specific repo
+```
+
 ### Specify Repository Path
 
 Analyze a repository in a different directory:
@@ -101,6 +129,23 @@ dart pub global run dgt --path /path/to/repo
 # or
 dart pub global run dgt -p D:\projects\dart-sdk
 ```
+
+### Configuration Commands
+
+Save default display preferences:
+
+```bash
+# Hide Gerrit columns by default
+dart pub global run dgt config --no-gerrit
+
+# Hide local columns by default
+dart pub global run dgt config --no-local
+
+# Show all columns (reset to defaults)
+dart pub global run dgt config --gerrit --local
+```
+
+Configuration is saved to `~/.dgt/.config` and applies to all repositories unless overridden by command-line flags.
 
 ### Help
 
