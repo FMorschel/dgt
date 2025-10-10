@@ -136,6 +136,33 @@ class GitService {
     return await _runGitCommand(<String>['log', '-1', '--format=%ci', branch]);
   }
 
+  /// Gets both commit hash and date for a given branch in a single Git call.
+  ///
+  /// This is more efficient than calling [getCommitHash] and [getCommitDate]
+  /// separately.
+  ///
+  /// [branch] - The branch name to get the commit info for.
+  /// Returns a record with (hash: String, date: String).
+  static Future<({String hash, String date})> getCommitHashAndDate(
+    String branch,
+  ) async {
+    // Use git log with custom format to get both hash and date in one call
+    // Format: <hash>|<date>
+    final output = await _runGitCommand(<String>[
+      'log',
+      '-1',
+      '--format=%H|%ci',
+      branch,
+    ]);
+
+    final parts = output.split('|');
+    if (parts.length != 2) {
+      throw FormatException('Unexpected git log output format: $output');
+    }
+
+    return (hash: parts[0], date: parts[1]);
+  }
+
   /// Gets the commit message for a given branch.
   ///
   /// [branch] - The branch name to get the commit message for.
@@ -202,44 +229,43 @@ class GitService {
   /// If the branch has no Gerrit config, returns an empty config object.
   static Future<GerritBranchConfig> getGerritConfig(String branch) async {
     try {
-      // Use git config to get branch-specific Gerrit settings
-      // These are typically set by Gerrit upload tools (e.g., git-cl, repo)
-      final gerritIssue = await _getConfigValue('branch.$branch.gerritissue');
-      final gerritServer = await _getConfigValue('branch.$branch.gerritserver');
-      final gerritPatchset = await _getConfigValue(
-        'branch.$branch.gerritpatchset',
-      );
-      final gerritSquashHash = await _getConfigValue(
-        'branch.$branch.gerritsquashhash',
-      );
-      final lastUploadHash = await _getConfigValue(
-        'branch.$branch.last-upload-hash',
-      );
+      // Use git config --get-regexp to get all branch config values at once
+      // This is much more efficient than making 5 separate git config calls
+      final output = await _runGitCommand(<String>[
+        'config',
+        '--get-regexp',
+        '^branch\\.$branch\\.gerrit',
+      ]);
+
+      // Parse the output to extract Gerrit config values
+      final config = <String, String>{};
+      for (final line in output.split('\n')) {
+        if (line.isEmpty) continue;
+
+        final parts = line.split(' ');
+        if (parts.length < 2) continue;
+
+        // Extract the key name (e.g., "gerritissue" from "branch.main.gerritissue")
+        final keyParts = parts[0].split('.');
+        if (keyParts.length < 3) continue;
+
+        final configKey = keyParts[2]; // e.g., "gerritissue"
+        final configValue = parts
+            .sublist(1)
+            .join(' '); // Handle values with spaces
+        config[configKey] = configValue;
+      }
 
       return GerritBranchConfig(
-        gerritIssue: gerritIssue,
-        gerritServer: gerritServer,
-        gerritPatchset: gerritPatchset,
-        gerritSquashHash: gerritSquashHash,
-        lastUploadHash: lastUploadHash,
+        gerritIssue: config['gerritissue'],
+        gerritServer: config['gerritserver'],
+        gerritPatchset: config['gerritpatchset'],
+        gerritSquashHash: config['gerritsquashhash'],
+        lastUploadHash: config['last-upload-hash'],
       );
     } catch (e) {
-      // Return empty config if any error occurs (e.g., not in a Git repo)
+      // Return empty config if any error occurs (e.g., not in a Git repo, or no gerrit config)
       return GerritBranchConfig();
-    }
-  }
-
-  /// Gets a single config value from Git config.
-  ///
-  /// [key] - The config key to retrieve (e.g., 'branch.main.gerritissue').
-  /// Returns the config value or null if not found.
-  static Future<String?> _getConfigValue(String key) async {
-    try {
-      final value = await _runGitCommand(<String>['config', '--get', key]);
-      return value.isNotEmpty ? value : null;
-    } catch (e) {
-      // Config key doesn't exist
-      return null;
     }
   }
 }
