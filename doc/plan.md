@@ -139,6 +139,22 @@ This plan outlines the steps to build a Minimum Viable Product (MVP) for DGT - a
   - Highlight Gerrit date in yellow when it differs from local date
   - Use status color for remaining columns
 - [x] Remove unused `_printColoredRow()` method
+- [x] **IMPROVEMENT**: Fix difference detection logic to use Git config metadata:
+  - [x] Add `lastUploadHash` field to `GerritBranchConfig` class
+  - [x] Parse `last-upload-hash` from `.git/config` in `GitService.getGerritConfig()`
+  - [x] Update `BranchInfo` to expose methods for checking sync state:
+    - `hasLocalChanges()`: Compare local HEAD with `last-upload-hash`
+    - `hasRemoteChanges()`: Compare `gerritsquashhash` with Gerrit's `current_revision`
+  - [x] Update `OutputFormatter._printBranchRow()` to use new detection methods:
+    - Highlight local hash in yellow when `hasLocalChanges()` is true
+    - Highlight Gerrit hash in yellow when `hasRemoteChanges()` is true
+  - [x] Update highlighting logic to provide clearer visual feedback:
+    - Local hash and date yellow = "You have unpushed changes"
+    - Gerrit hash and date yellow = "Gerrit has updates you don't have locally"
+  - [x] Handle edge cases:
+    - Missing `last-upload-hash` in config (treat as no local changes)
+    - Missing `gerritsquashhash` in config (fall back to current comparison)
+    - Null Gerrit change (no highlighting needed)
 
 ### Phase 9: Performance Optimization
 
@@ -148,7 +164,39 @@ This plan outlines the steps to build a Minimum Viable Product (MVP) for DGT - a
   - Implemented parallel Git operations using Future.wait for all branches
   - Added isolate-based JSON decoding to avoid blocking the main isolate
 
-### Phase 10: Documentation
+### Phase 10: Accurate Sync State Detection
+
+**Problem**: The current implementation compares local HEAD hash directly with Gerrit's current revision, which doesn't accurately represent whether you have local changes to upload or remote changes to pull.
+
+**Solution**: Use Git config metadata (`last-upload-hash` and `gerritsquashhash`) to accurately detect sync state.
+
+**Implementation Steps**:
+
+- [x] Extend `GerritBranchConfig` to include `lastUploadHash` field
+- [x] Parse `last-upload-hash` from Git config in `GitService.getGerritConfig()`
+- [x] Add sync state detection methods to `BranchInfo`:
+  - `hasLocalChanges()`: Returns true when local HEAD ≠ last-upload-hash
+  - `hasRemoteChanges()`: Returns true when gerritsquashhash ≠ Gerrit current_revision
+- [x] Update `OutputFormatter` to highlight based on sync state:
+  - Yellow local hash and date = unpushed local changes exist
+  - Yellow Gerrit hash and date = Gerrit has updates not in local branch
+- [x] Handle edge cases (missing config fields, null values)
+- [ ] Test with various scenarios:
+  - Fresh branch (no uploads yet)
+  - Branch with local commits after upload
+  - Branch where Gerrit has been rebased/amended
+  - Branch in sync (all hashes match)
+
+**Expected Behavior**:
+
+| Scenario | Local Hash/Date Color | Gerrit Hash/Date Color | Meaning |
+|----------|----------------------|------------------------|---------|
+| In sync | Normal | Normal | No changes either side |
+| Local changes | **Yellow** | Normal | Need to upload |
+| Remote changes | Normal | **Yellow** | Need to pull/rebase |
+| Both changed | **Yellow** | **Yellow** | Diverged state |
+
+### Phase 11: Documentation
 
 - [x] Add code comments for complex logic
 - [x] Document Gerrit API endpoints used

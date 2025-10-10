@@ -34,7 +34,8 @@ Future<void> runConfigCommand(
     Terminal.info('');
     Terminal.info('These settings will be used as defaults for future runs.');
     Terminal.info(
-      'You can override them with command-line flags like --no-gerrit or --no-local.',
+      'You can override them with command-line flags like --no-gerrit or '
+      '--no-local.',
     );
   } catch (e) {
     Terminal.error('Error saving configuration: $e');

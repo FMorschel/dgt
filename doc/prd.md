@@ -98,8 +98,8 @@ Gerrit data for each branch is stored in the Git config file (`.git/config`) wit
 - `gerritissue`: The Gerrit change/issue number (e.g., 389423)
 - `gerritserver`: The Gerrit server URL (e.g., <https://dart-review.googlesource.com>)
 - `gerritpatchset`: The current patchset number
-- `gerritsquashhash`: Hash of the squashed commit in Gerrit
-- `last-upload-hash`: Hash of the last uploaded commit
+- `gerritsquashhash`: Hash of the squashed commit in Gerrit (the commit hash as it exists in the Gerrit review)
+- `last-upload-hash`: Hash of the last uploaded commit from the local branch
 - `base`: The base commit hash this branch was created from
 - `base-upstream`: The upstream reference branch
 
@@ -108,7 +108,8 @@ Gerrit data for each branch is stored in the Git config file (`.git/config`) wit
 - Read and parse `.git/config` file to extract branch-specific Gerrit metadata
 - Extract `gerritissue` and `gerritserver` to construct Gerrit API URLs
 - Use `gerritissue` to query the Gerrit API for change status
-- Compare `gerritsquashhash` with local commit hashes to detect drift
+- **Compare `last-upload-hash` with local HEAD to detect local changes not yet uploaded**
+- **Compare `gerritsquashhash` with Gerrit's current revision to detect remote changes not yet pulled**
 - Extract commit hashes from local Git history
 - Extract commit timestamps from local Git history
 - Handle branches without Gerrit configuration gracefully
@@ -145,6 +146,40 @@ hotfix/critical      | Merge conflict | I6284a29c41b37...  | u7v8w9x     | 2025-
 - **Active**: Green
 - **Merge conflict**: Red
 - **Merged**: Blue/Cyan
+
+**Difference Highlighting**:
+
+The tool highlights differences between local and Gerrit state to help identify sync issues:
+
+- **Yellow Gerrit Hash**: Indicates that Gerrit's current revision differs from the local HEAD commit
+  - This means either:
+    - The Gerrit change has been updated (new patchset uploaded, rebased, amended)
+    - The local branch is based on an older patchset
+  - **Detection**: Compare `gerritsquashhash` (from Git config) with Gerrit API's `current_revision`
+  
+- **Yellow Gerrit Date**: Indicates temporal difference, often accompanying hash differences
+  - Shows the last update time differs between local and remote
+
+- **Yellow Local Hash**: Indicates local changes not yet uploaded to Gerrit
+  - This means:
+    - The local branch has new commits since the last upload
+    - Changes need to be uploaded to Gerrit
+  - **Detection**: Compare local HEAD hash with `last-upload-hash` (from Git config)
+
+**Current Implementation Issue**:
+
+The current implementation compares the truncated local HEAD hash directly with Gerrit's current revision hash, which doesn't accurately represent the sync state because:
+
+1. It doesn't use `last-upload-hash` to detect local changes
+2. It doesn't use `gerritsquashhash` to detect remote changes
+3. Hash comparison is unreliable when rebases or amendments occur
+
+**Improved Detection Logic**:
+
+```
+Local changes exist when: local_HEAD_hash ≠ last-upload-hash
+Remote changes exist when: gerritsquashhash ≠ gerrit_current_revision
+```
 
 ## Non-Goals
 

@@ -95,173 +95,6 @@ class GerritService {
   /// The XSSI protection prefix that Gerrit adds to JSON responses
   static const String xssiPrefix = ")]}'\n";
 
-  /// Decodes JSON in a separate isolate to avoid blocking the main isolate.
-  ///
-  /// Large JSON responses can cause the UI to freeze if decoded on the main thread.
-  /// By running the decode operation in a separate isolate, we prevent blocking
-  /// the main event loop, ensuring smooth execution even with large payloads.
-  ///
-  /// [jsonString] - The JSON string to decode
-  /// Returns the decoded JSON data (typically a Map or List).
-  static Future<dynamic> _decodeJsonInIsolate(String jsonString) async {
-    return await Isolate.run(() => jsonDecode(jsonString));
-  }
-
-  /// Constructs the Gerrit API URL for looking up a change by Change-ID.
-  ///
-  /// [changeId] - The Change-ID to look up (e.g., "Iabc123...")
-  /// Returns the full API URL.
-  static String buildChangeUrl(String changeId) {
-    // URL encode the change ID to handle special characters
-    final encodedChangeId = Uri.encodeComponent(changeId);
-    return '$baseUrl/changes/?q=change:$encodedChangeId';
-  }
-
-  /// Constructs the Gerrit API URL for looking up a change by issue number.
-  ///
-  /// [issueNumber] - The Gerrit issue/change number (e.g., "389423")
-  /// [serverUrl] - The Gerrit server URL (defaults to dart-review.googlesource.com)
-  /// Returns the full API URL.
-  static String buildChangeUrlByIssue(String issueNumber, [String? serverUrl]) {
-    final server = serverUrl ?? baseUrl;
-    return '$server/changes/$issueNumber/?o=CURRENT_REVISION';
-  }
-
-  /// Constructs the Gerrit API URL for fetching mergeable info for a change.
-  ///
-  /// [issueNumber] - The Gerrit issue/change number (e.g., "389423")
-  /// [serverUrl] - The Gerrit server URL (defaults to dart-review.googlesource.com)
-  /// Returns the full API URL for the mergeable endpoint.
-  static String buildMergeableUrl(String issueNumber, [String? serverUrl]) {
-    final server = serverUrl ?? baseUrl;
-    return '$server/changes/$issueNumber/revisions/current/mergeable';
-  }
-
-  /// Queries the Gerrit API for a change by its issue number.
-  ///
-  /// This is the preferred method for querying Gerrit when you have the issue number
-  /// from Git config, as it's more efficient than searching by Change-ID.
-  ///
-  /// The API endpoint format is: GET /changes/{issue}?o=CURRENT_REVISION
-  /// The CURRENT_REVISION option includes the current commit hash in the response.
-  ///
-  /// Gerrit's JSON responses include an XSSI protection prefix ")]}'\n" which must
-  /// be stripped before parsing. This prevents the response from being executable
-  /// as JavaScript, protecting against cross-site scripting attacks.
-  ///
-  /// [issueNumber] - The Gerrit issue/change number to look up (e.g., "389423")
-  /// [serverUrl] - The Gerrit server URL (optional, defaults to dart-review.googlesource.com)
-  /// Returns a [GerritChange] object or null if not found (HTTP 404).
-  /// Throws an exception if the API request fails with other errors.
-  static Future<GerritChange?> getChangeByIssueNumber(
-    String issueNumber, [
-    String? serverUrl,
-  ]) async {
-    final url = buildChangeUrlByIssue(issueNumber, serverUrl);
-
-    try {
-      final response = await http.get(Uri.parse(url));
-
-      if (response.statusCode == 404) {
-        // Change not found - this is a normal case (branch might not be uploaded yet)
-        return null;
-      }
-
-      if (response.statusCode != 200) {
-        throw Exception(
-          'Gerrit API request failed with status ${response.statusCode}: ${response.body}',
-        );
-      }
-
-      // Handle Gerrit's XSSI protection prefix: ")]}'\n"
-      // This prefix prevents the JSON from being executed as JavaScript
-      var jsonBody = response.body;
-      if (jsonBody.startsWith(xssiPrefix)) {
-        jsonBody = jsonBody.substring(xssiPrefix.length);
-      }
-
-      // Parse the JSON response in a separate isolate to avoid blocking
-      final jsonData = await _decodeJsonInIsolate(jsonBody);
-
-      if (jsonData is Map<String, dynamic>) {
-        // Direct change object returned
-        return GerritChange.fromJson(jsonData);
-      }
-
-      throw Exception('Unexpected Gerrit API response format');
-    } catch (e) {
-      // Re-throw with more context to help debugging
-      throw Exception('Failed to query Gerrit API for issue $issueNumber: $e');
-    }
-  }
-
-  /// Queries the Gerrit API for a change by its Change-ID.
-  ///
-  /// [changeId] - The Change-ID to look up
-  /// Returns a [GerritChange] object or null if not found.
-  /// Throws an exception if the API request fails.
-  static Future<GerritChange?> getChangeByChangeId(String changeId) async {
-    final url = buildChangeUrl(changeId);
-
-    try {
-      final response = await http.get(Uri.parse(url));
-
-      if (response.statusCode != 200) {
-        throw Exception(
-          'Gerrit API request failed with status ${response.statusCode}: ${response.body}',
-        );
-      }
-
-      // Handle Gerrit's XSSI protection prefix
-      var jsonBody = response.body;
-      if (jsonBody.startsWith(xssiPrefix)) {
-        jsonBody = jsonBody.substring(xssiPrefix.length);
-      }
-
-      // Parse the JSON response in a separate isolate
-      final jsonData = await _decodeJsonInIsolate(jsonBody);
-
-      // Gerrit returns an array of changes
-      if (jsonData is List && jsonData.isEmpty) {
-        // No change found
-        return null;
-      }
-
-      if (jsonData is List && jsonData.isNotEmpty) {
-        // Return the first matching change
-        return GerritChange.fromJson(jsonData[0] as Map<String, dynamic>);
-      }
-
-      throw Exception('Unexpected Gerrit API response format');
-    } catch (e) {
-      // Re-throw with more context
-      throw Exception('Failed to query Gerrit API for change $changeId: $e');
-    }
-  }
-
-  /// Queries the Gerrit API for multiple changes by their Change-IDs.
-  ///
-  /// [changeIds] - List of Change-IDs to look up
-  /// Returns a map of Change-ID to GerritChange (or null if not found).
-  /// This allows partial success - some changes may be found while others are not.
-  static Future<Map<String, GerritChange?>> getChangesByChangeIds(
-    List<String> changeIds,
-  ) async {
-    final results = <String, GerritChange?>{};
-
-    // Query each change individually
-    for (final changeId in changeIds) {
-      try {
-        results[changeId] = await getChangeByChangeId(changeId);
-      } catch (e) {
-        // Allow partial success - if one query fails, continue with others
-        results[changeId] = null;
-      }
-    }
-
-    return results;
-  }
-
   /// Maximum number of issues per batch query (Gerrit API limitation).
   static const int maxIssuesPerBatch = 10;
 
@@ -331,7 +164,8 @@ class GerritService {
           jsonBody = jsonBody.substring(xssiPrefix.length);
         }
 
-        // Parse the JSON response (already in isolate, so direct decode is fine)
+        // Parse the JSON response (already in isolate, so direct decode is
+        // fine)
         final jsonData = jsonDecode(jsonBody);
 
         // Initialize all results as null (not found)
@@ -349,8 +183,9 @@ class GerritService {
               final changeJson = queryResult[0] as Map<String, dynamic>;
               final change = GerritChange.fromJson(changeJson);
 
-              // Match the change back to the issue number using the _number field
-              // This field contains the Gerrit change number (same as issue number)
+              // Match the change back to the issue number using the _number
+              // field. This field contains the Gerrit change number (same as
+              //issue number)
               final changeNumber = changeJson['_number']?.toString();
               if (changeNumber != null && results.containsKey(changeNumber)) {
                 results[changeNumber] = change;
@@ -360,6 +195,7 @@ class GerritService {
         }
 
         // Fetch mergeable data for all found changes in parallel
+        // Note: mergeable info requires separate API calls to /revisions/current/mergeable
         final mergeableFutures = <String, Future<bool>>{};
         for (final entry in results.entries) {
           if (entry.value != null) {
@@ -392,7 +228,7 @@ class GerritService {
           }
         }
 
-        // Wait for all mergeable requests to complete
+        // Wait for all mergeable requests to complete in parallel
         if (mergeableFutures.isNotEmpty) {
           final mergeableResults = await Future.wait(
             mergeableFutures.entries.map((entry) async {
@@ -434,19 +270,33 @@ class GerritService {
     });
   }
 
-  /// Queries the Gerrit API for multiple changes by their issue numbers in batch requests.
+  /// Queries the Gerrit API for multiple changes by their issue numbers in
+  /// batch requests.
   ///
-  /// Uses the multi-query pattern: GET /changes/?q={query_1}&q={query_2}&q={query_3}...
+  /// Uses the multi-query pattern:
+  /// GET /changes/?q={query_1}&q={query_2}&q={query_3}...
   /// This is more efficient than making individual API calls for each issue.
   ///
-  /// Automatically splits large requests into batches of up to 10 issues per request
+  /// Automatically splits large requests into batches of up to 10 issues per
+  /// request
   /// (Gerrit API limitation) and executes each batch in a separate isolate for
   /// optimal performance.
   ///
+  /// For each batch:
+  /// 1. Fetches up to 10 changes in a single batched HTTP request
+  /// 2. Fetches mergeable status for all found changes in parallel (separate
+  /// requests required)
+  ///
+  /// Total HTTP requests per batch: 1 batch query + N mergeable queries (where
+  /// N ≤ 10)
+  /// All mergeable requests execute in parallel to minimize total time.
+  ///
   /// [issueNumbers] - List of Gerrit issue/change numbers to look up
-  /// [serverUrl] - The Gerrit server URL (optional, defaults to dart-review.googlesource.com)
+  /// [serverUrl] - The Gerrit server URL (optional, defaults to
+  /// dart-review.googlesource.com)
   /// Returns a map of issue number to GerritChange (or null if not found).
-  /// This allows partial success - some changes may be found while others are not.
+  /// This allows partial success - some changes may be found while others are
+  /// not.
   static Future<Map<String, GerritChange?>> getBatchChangesByIssueNumbers(
     List<String> issueNumbers, [
     String? serverUrl,

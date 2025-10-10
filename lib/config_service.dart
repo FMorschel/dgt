@@ -93,7 +93,8 @@ class ConfigService {
                 print('[VERBOSE] Set .dgt folder as hidden on Windows');
               } else {
                 print(
-                  '[VERBOSE] Failed to set .dgt folder as hidden: ${result.stderr}',
+                  '[VERBOSE] Failed to set .dgt folder as hidden: '
+                  '${result.stderr}',
                 );
               }
             }
