@@ -1,7 +1,9 @@
-/// A utility class for tracking and reporting performance metrics of operations.
+/// A utility class for tracking and reporting performance metrics of
+/// operations.
 ///
 /// This class helps measure execution time of different operations in the CLI
-/// tool, providing insights into performance bottlenecks and execution patterns.
+/// tool, providing insights into performance bottlenecks and execution
+/// patterns.
 class PerformanceTracker {
   /// Map storing operation names to their durations in milliseconds.
   final Map<String, int> _timings = {};

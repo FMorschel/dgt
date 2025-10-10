@@ -110,6 +110,7 @@ Performance Summary:
   Git operations:         320ms
   Gerrit API queries:     890ms
   Result processing:       28ms
+  Filtering:                3ms
   Total execution time:  1283ms
 ```
 
@@ -145,7 +146,85 @@ dart pub global run dgt config --no-local
 dart pub global run dgt config --gerrit --local
 ```
 
+Save default filter preferences:
+
+```bash
+# Set default to show only Active branches
+dart pub global run dgt config --status active
+
+# Set default to show only diverged branches
+dart pub global run dgt config --diverged
+
+# Set default to show branches since a date
+dart pub global run dgt config --since 2025-10-01
+
+# Combine multiple defaults
+dart pub global run dgt config --status active --status wip --diverged
+```
+
 Configuration is saved to `~/.dgt/.config` and applies to all repositories unless overridden by command-line flags.
+
+### Filtering Branches
+
+Filter the branch list to focus on specific branches:
+
+**Filter by Status:**
+
+```bash
+# Show only Active branches
+dart pub global run dgt --status active
+
+# Show Active and WIP branches
+dart pub global run dgt --status active --status wip
+
+# Show only merged branches
+dart pub global run dgt --status merged
+
+# Show only branches with merge conflicts
+dart pub global run dgt --status conflict
+```
+
+Allowed status values:
+
+- `wip` - Work in Progress
+- `active` - Ready for review
+- `merged` - Successfully merged
+- `conflict` - Has merge conflicts
+
+> **Tip:** Run `dgt --help` to see all available options and status values.
+
+**Filter by Date:**
+
+```bash
+# Show branches with commits after October 1st, 2025
+dart pub global run dgt --since 2025-10-01
+
+# Show branches with commits before October 10th, 2025
+dart pub global run dgt --before 2025-10-10
+
+# Show branches in a date range
+dart pub global run dgt --since 2025-10-01 --before 2025-10-10
+```
+
+**Filter by Divergence:**
+
+```bash
+# Show only branches that have diverged (local or remote changes)
+dart pub global run dgt --diverged
+
+# Combine with status filter
+dart pub global run dgt --status active --diverged
+```
+
+**Combining Filters:**
+
+```bash
+# Active branches that have diverged, updated since October 1st
+dart pub global run dgt --status active --diverged --since 2025-10-01
+
+# WIP or Active branches from the last week
+dart pub global run dgt --status wip --status active --since 2025-10-03
+```
 
 ### Help
 

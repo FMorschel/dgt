@@ -118,4 +118,13 @@ class BranchInfo {
     // If they differ, Gerrit has been updated since our last sync
     return gerritRevision != squashHash;
   }
+
+  /// Checks if this branch has diverged from its Gerrit state.
+  ///
+  /// Returns true if the branch has either local changes not yet uploaded
+  /// or remote changes not yet pulled/rebased.
+  ///
+  /// This is a convenience method equivalent to:
+  /// `hasLocalChanges() || hasRemoteChanges()`
+  bool get diverged => hasLocalChanges() || hasRemoteChanges();
 }

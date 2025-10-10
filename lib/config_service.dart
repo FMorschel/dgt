@@ -3,22 +3,44 @@ import 'dart:io';
 
 /// Configuration options for the dgt tool
 class DgtConfig {
-  DgtConfig({this.showLocal, this.showGerrit});
+  DgtConfig({
+    this.showLocal,
+    this.showGerrit,
+    this.filterStatuses,
+    this.filterSince,
+    this.filterBefore,
+    this.filterDiverged,
+  });
 
   factory DgtConfig.fromJson(Map<String, dynamic> json) {
     return DgtConfig(
       showLocal: json['local'] as bool?,
       showGerrit: json['gerrit'] as bool?,
+      filterStatuses: (json['filterStatuses'] as List<dynamic>?)
+          ?.map((e) => e as String)
+          .toList(),
+      filterSince: json['filterSince'] as String?,
+      filterBefore: json['filterBefore'] as String?,
+      filterDiverged: json['filterDiverged'] as bool?,
     );
   }
 
   final bool? showLocal;
   final bool? showGerrit;
+  final List<String>? filterStatuses;
+  final String? filterSince;
+  final String? filterBefore;
+  final bool? filterDiverged;
 
   Map<String, dynamic> toJson() {
     return {
       if (showLocal != null) 'local': showLocal,
       if (showGerrit != null) 'gerrit': showGerrit,
+      if (filterStatuses != null && filterStatuses!.isNotEmpty)
+        'filterStatuses': filterStatuses,
+      if (filterSince != null) 'filterSince': filterSince,
+      if (filterBefore != null) 'filterBefore': filterBefore,
+      if (filterDiverged != null) 'filterDiverged': filterDiverged,
     };
   }
 }
@@ -56,6 +78,19 @@ class ConfigService {
         print('[VERBOSE] Loaded config from: $configPath');
         print('[VERBOSE]   local: ${config.showLocal}');
         print('[VERBOSE]   gerrit: ${config.showGerrit}');
+        if (config.filterStatuses != null &&
+            config.filterStatuses!.isNotEmpty) {
+          print('[VERBOSE]   filterStatuses: ${config.filterStatuses}');
+        }
+        if (config.filterSince != null) {
+          print('[VERBOSE]   filterSince: ${config.filterSince}');
+        }
+        if (config.filterBefore != null) {
+          print('[VERBOSE]   filterBefore: ${config.filterBefore}');
+        }
+        if (config.filterDiverged != null) {
+          print('[VERBOSE]   filterDiverged: ${config.filterDiverged}');
+        }
       }
 
       return config;

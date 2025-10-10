@@ -245,7 +245,8 @@ class GitService {
         final parts = line.split(' ');
         if (parts.length < 2) continue;
 
-        // Extract the key name (e.g., "gerritissue" from "branch.main.gerritissue")
+        // Extract the key name (e.g., "gerritissue" from
+        // "branch.main.gerritissue")
         final keyParts = parts[0].split('.');
         if (keyParts.length < 3) continue;
 
@@ -264,7 +265,8 @@ class GitService {
         lastUploadHash: config['last-upload-hash'],
       );
     } catch (e) {
-      // Return empty config if any error occurs (e.g., not in a Git repo, or no gerrit config)
+      // Return empty config if any error occurs (e.g., not in a Git repo, or
+      //no gerrit config)
       return GerritBranchConfig();
     }
   }
