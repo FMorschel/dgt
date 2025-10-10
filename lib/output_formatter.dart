@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'branch_info.dart';
 import 'performance_tracker.dart';
 import 'terminal.dart';
@@ -32,9 +34,18 @@ class OutputFormatter {
       Terminal.info('');
     }
 
+    // Calculate dynamic width for branch name column
+    var maxBranchNameLength = 0;
+    for (final branchInfo in branchInfoList) {
+      if (branchInfo.branchName.length > maxBranchNameLength) {
+        maxBranchNameLength = branchInfo.branchName.length;
+      }
+    }
+    final branchNameColWidth = max(20, maxBranchNameLength + 1);
+
     // Define column headers and widths based on what should be displayed
     final headers = <String>['Branch Name', 'Status'];
-    final columnWidths = <int>[20, 17];
+    final columnWidths = <int>[branchNameColWidth, 17];
 
     if (showLocal) {
       headers.addAll(['Local Hash', 'Local Date']);
