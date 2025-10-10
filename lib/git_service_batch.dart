@@ -1,5 +1,6 @@
 import 'dart:io';
-import 'package:dgt/git_service.dart';
+
+import 'git_service.dart';
 
 /// Batch operations for GitService to reduce process spawn overhead.
 class GitServiceBatch {
@@ -9,22 +10,20 @@ class GitServiceBatch {
   /// which is more efficient than spawning separate git processes per branch.
   ///
   /// Returns a map of branch name to (hash, date) tuples.
-  static Future<Map<String, ({String hash, String date})>>
-      getBatchCommitInfo(List<String> branches) async {
+  static Future<Map<String, ({String hash, String date})>> getBatchCommitInfo(
+    List<String> branches,
+  ) async {
     if (branches.isEmpty) {
       return {};
     }
 
     // Use git for-each-ref to get all branch info at once
     // Format: <refname>|<objectname>|<committerdate:iso8601>
-    final result = await Process.run(
-      'git',
-      [
-        'for-each-ref',
-        '--format=%(refname:short)|%(objectname)|%(committerdate:iso8601)',
-        ...branches.map((b) => 'refs/heads/$b'),
-      ],
-    );
+    final result = await Process.run('git', [
+      'for-each-ref',
+      '--format=%(refname:short)|%(objectname)|%(committerdate:iso8601)',
+      ...branches.map((b) => 'refs/heads/$b'),
+    ]);
 
     if (result.exitCode != 0) {
       throw ProcessException(
@@ -70,10 +69,11 @@ class GitServiceBatch {
     try {
       // Get all branch configs at once
       // We need both gerrit* keys and last-upload-hash
-      final result = await Process.run(
-        'git',
-        ['config', '--get-regexp', '^branch\\..*\\.(gerrit|last-upload-hash)'],
-      );
+      final result = await Process.run('git', [
+        'config',
+        '--get-regexp',
+        '^branch\\..*\\.(gerrit|last-upload-hash)',
+      ]);
 
       if (result.exitCode != 0) {
         // No gerrit config found
@@ -99,9 +99,8 @@ class GitServiceBatch {
         final configKey = keyParts[2];
         final configValue = parts.sublist(1).join(' ');
 
-        configsByBranch
-            .putIfAbsent(branchName, () => {})
-            [configKey] = configValue;
+        configsByBranch.putIfAbsent(branchName, () => {})[configKey] =
+            configValue;
       }
 
       // Convert to GerritBranchConfig objects

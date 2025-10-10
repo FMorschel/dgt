@@ -184,38 +184,44 @@ Future<void> runListCommand(
     // This uses git for-each-ref and git config --get-regexp to get data for
     // all branches in just 2 git commands instead of 2*N commands.
     if (verbose) {
-      Terminal.info('[VERBOSE] Batch fetching Git information for all branches...');
+      Terminal.info(
+        '[VERBOSE] Batch fetching Git information for all branches...',
+      );
     }
 
     tracker?.startTimer('git_operations');
-    
+
     // Fetch commit info and Gerrit config for all branches in parallel
     final results = await Future.wait([
       GitServiceBatch.getBatchCommitInfo(branches),
       GitServiceBatch.getBatchGerritConfig(branches),
     ]);
-    
-    final commitInfoMap = results[0] as Map<String, ({String hash, String date})>;
+
+    final commitInfoMap =
+        results[0] as Map<String, ({String hash, String date})>;
     final gerritConfigMap = results[1] as Map<String, GerritBranchConfig>;
-    
+
     // Build branch data list
-    final branchDataList = <({
-      String branch,
-      String localHash,
-      String localDate,
-      GerritBranchConfig gerritConfig,
-      Object? error,
-    })>[];
-    
+    final branchDataList =
+        <
+          ({
+            String branch,
+            String localHash,
+            String localDate,
+            GerritBranchConfig gerritConfig,
+            Object? error,
+          })
+        >[];
+
     for (final branch in branches) {
       final commitInfo = commitInfoMap[branch];
       final gerritConfig = gerritConfigMap[branch] ?? GerritBranchConfig();
-      
+
       if (commitInfo != null) {
         if (verbose) {
           Terminal.info('[VERBOSE] Processing branch: $branch');
         }
-        
+
         branchDataList.add((
           branch: branch,
           localHash: commitInfo.hash,
@@ -225,7 +231,9 @@ Future<void> runListCommand(
         ));
       } else {
         if (verbose) {
-          Terminal.warning('[VERBOSE] Failed to get commit info for branch $branch');
+          Terminal.warning(
+            '[VERBOSE] Failed to get commit info for branch $branch',
+          );
         }
         branchDataList.add((
           branch: branch,
@@ -236,7 +244,7 @@ Future<void> runListCommand(
         ));
       }
     }
-    
+
     tracker?.endTimer('git_operations');
 
     // Build issue number mapping

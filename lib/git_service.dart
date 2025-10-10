@@ -148,17 +148,18 @@ class GitService {
   ) async {
     // Use git log with custom format to get both hash and date in one call
     // Format: <hash>|<date>
-    final output = await _runGitCommand(
-      <String>['log', '-1', '--format=%H|%ci', branch],
-    );
-    
+    final output = await _runGitCommand(<String>[
+      'log',
+      '-1',
+      '--format=%H|%ci',
+      branch,
+    ]);
+
     final parts = output.split('|');
     if (parts.length != 2) {
-      throw FormatException(
-        'Unexpected git log output format: $output',
-      );
+      throw FormatException('Unexpected git log output format: $output');
     }
-    
+
     return (hash: parts[0], date: parts[1]);
   }
 
@@ -230,24 +231,28 @@ class GitService {
     try {
       // Use git config --get-regexp to get all branch config values at once
       // This is much more efficient than making 5 separate git config calls
-      final output = await _runGitCommand(
-        <String>['config', '--get-regexp', '^branch\\.$branch\\.gerrit'],
-      );
+      final output = await _runGitCommand(<String>[
+        'config',
+        '--get-regexp',
+        '^branch\\.$branch\\.gerrit',
+      ]);
 
       // Parse the output to extract Gerrit config values
       final config = <String, String>{};
       for (final line in output.split('\n')) {
         if (line.isEmpty) continue;
-        
+
         final parts = line.split(' ');
         if (parts.length < 2) continue;
-        
+
         // Extract the key name (e.g., "gerritissue" from "branch.main.gerritissue")
         final keyParts = parts[0].split('.');
         if (keyParts.length < 3) continue;
-        
+
         final configKey = keyParts[2]; // e.g., "gerritissue"
-        final configValue = parts.sublist(1).join(' '); // Handle values with spaces
+        final configValue = parts
+            .sublist(1)
+            .join(' '); // Handle values with spaces
         config[configKey] = configValue;
       }
 
