@@ -253,31 +253,31 @@ This plan outlines the steps to build a Minimum Viable Product (MVP) for DGT - a
 
 ### Phase 14: Sorting
 
-- [ ] Add sorting CLI flags to `bin/dgt.dart`:
+- [x] Add sorting CLI flags to `bin/dgt.dart`:
   - `--sort <field>` where `<field>` is one of: `local-date`, `gerrit-date`, `status`, `divergences`, `name`
   - `--asc` to sort in ascending order (default if `--sort` is used without direction)
   - `--desc` to sort in descending order
-- [ ] Validate sort field input and provide helpful error messages for invalid values
-- [ ] Ensure `BranchInfo` exposes fields needed for sorting: `localDate`, `gerritDate`, `status`, `name`
-- [ ] Implement sorting logic:
+- [x] Validate sort field input and provide helpful error messages for invalid values
+- [x] Ensure `BranchInfo` exposes fields needed for sorting: `localDate`, `gerritDate`, `status`, `name`
+- [x] Implement sorting logic:
   - Create `applySort(List<BranchInfo> branches, SortOptions sortOptions)` function
   - Provide stable sorting using `List.sort()` with comparator functions for each field
   - For `divergences` sort, compute a score: 2 = both diverged, 1 = one side diverged, 0 = in sync
-- [ ] Integrate sorting into the output pipeline (after filtering, before formatting)
-- [ ] Add sorting indicator in output header when `--sort` is used (e.g., `Sorted by: status (desc)`)
-- [ ] Extend `ConfigService` to save/load sort defaults (field and direction)
-- [ ] Extend `config` command to support sort options:
+- [x] Integrate sorting into the output pipeline (after filtering, before formatting)
+- [x] Add sorting indicator in output header when `--sort` is used (e.g., `Sorted by: status (desc)`)
+- [x] Extend `ConfigService` to save/load sort defaults (field and direction)
+- [x] Extend `config` command to support sort options:
   - `dgt config --sort local-date --desc` (save sort defaults)
   - `dgt config --no-sort` (clear sort defaults)
   - Load saved sort configuration automatically on each run (unless overridden by CLI flags)
   - CLI flags always take precedence over config defaults
-- [ ] Update `--help` text with sorting examples:
+- [x] Update `--help` text with sorting examples:
   - `dgt --sort local-date --desc`
   - `dgt --sort status`
   - `dgt --status Active --sort divergences --desc`
   - `dgt config --sort local-date --asc` (save as default)
   - `dgt config --no-sort` (clear saved sort)
-- [ ] Update `README.md` with sorting usage examples
+- [x] Update `README.md` with sorting usage examples
 
 ---
 
