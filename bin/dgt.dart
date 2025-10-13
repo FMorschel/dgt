@@ -722,9 +722,7 @@ Future<void> main(List<String> arguments) async {
 
         // Validate that asc and desc are not both specified
         if (results.wasParsed('asc') && results.wasParsed('desc')) {
-          Terminal.error(
-            'Error: Cannot specify both --asc and --desc flags.',
-          );
+          Terminal.error('Error: Cannot specify both --asc and --desc flags.');
           Terminal.info('Please use only one sort direction flag.');
           return;
         }
