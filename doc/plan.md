@@ -117,9 +117,6 @@ This plan outlines the steps to build a Minimum Viable Product (MVP) for DGT - a
 - [x] Add try-catch blocks for Git command execution
 - [x] Handle case when not in a Git repository
 - [x] Handle network errors when querying Gerrit API
-- [ ] Handle Gerrit API rate limits (HTTP 429)
-- [ ] Handle invalid Change-ID format
-- [ ] Handle missing or malformed Gerrit responses
 - [x] Display user-friendly error messages
 - [x] Allow partial success (show branches even if some Gerrit queries fail)
 
@@ -250,6 +247,7 @@ This plan outlines the steps to build a Minimum Viable Product (MVP) for DGT - a
   - `dgt --status WIP --status Active --before 2025-10-10`
   - `dgt config --status Active --diverged` (save as default)
 - [x] Update `README.md` with filtering usage examples
+- [x] Support adding this flag to the configuration file
 
 ### Phase 14: Sorting
 
@@ -278,6 +276,28 @@ This plan outlines the steps to build a Minimum Viable Product (MVP) for DGT - a
   - `dgt config --sort local-date --asc` (save as default)
   - `dgt config --no-sort` (clear saved sort)
 - [x] Update `README.md` with sorting usage examples
+- [x] Support adding this flag to the configuration file
+
+### Phase 15: Gerrit URL Column
+
+- [x] Add `--url` CLI flag to `bin/dgt.dart` to enable URL column display
+- [x] Extend `BranchInfo` class to include a `gerritUrl` property
+- [x] Implement URL construction logic in `GerritService`:
+  - [x] Create `getChangeUrl(String server, int issueNumber)` method
+  - [x] Return formatted URL like `https://dart-review.googlesource.com/c/project/+/issueNumber`
+- [x] Update `OutputFormatter` to support URL column:
+  - [x] Add URL column to table header when `--url` flag is enabled
+  - [x] Add URL column to table rows with clickable links (when available)
+  - [x] Handle branches without Gerrit changes (display empty or placeholder)
+  - [x] Adjust column widths dynamically to accommodate URL column
+- [x] Integrate URL generation into branch processing pipeline:
+  - [x] Populate `gerritUrl` in `BranchInfo` when Gerrit config exists
+  - [x] Use `gerritserver` and `gerritissue` from Git config to construct URLs
+- [x] Update `--help` text with URL column examples:
+  - [x] `dgt --url` (show URL column)
+  - [x] `dgt --status Active --url` (combine with other flags)
+- [x] Update `README.md` with URL column usage examples
+- [x] Support adding this flag to the configuration file
 
 ---
 

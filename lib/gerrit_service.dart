@@ -334,4 +334,27 @@ class GerritService {
 
     return results;
   }
+
+  /// Construct a human-facing Gerrit change URL for a given server and
+  /// issue number. Returns null when input is invalid.
+  ///
+  /// Example: getChangeUrl('https://dart-review.googlesource.com', '389423')
+  /// returns 'https://dart-review.googlesource.com/c/389423' (or a more
+  /// specific project path if available). For broad compatibility we use
+  /// the generic /c/&ltissue&gt form which redirects to the change page.
+  static String? getChangeUrl(String? serverUrl, String? issueNumber) {
+    if (serverUrl == null || serverUrl.isEmpty) return null;
+    if (issueNumber == null || issueNumber.isEmpty) return null;
+
+    // Normalize server URL (remove trailing slash)
+    var server = serverUrl;
+    if (server.endsWith('/')) {
+      server = server.substring(0, server.length - 1);
+    }
+
+    // Use the generic Gerrit change URL format. Some Gerrit instances
+    // support /c/<project>/+/<issue>, but without project information the
+    // /c/+/issue form will still route to the change.
+    return '$server/c/$issueNumber';
+  }
 }

@@ -13,6 +13,7 @@ class BranchInfo {
     required this.localDate,
     required this.gerritConfig,
     required this.gerritChange,
+    required this.gerritUrl,
   });
 
   /// The name of the branch
@@ -29,6 +30,9 @@ class BranchInfo {
 
   /// The Gerrit change object (nullable if no Gerrit change found)
   final GerritChange? gerritChange;
+
+  /// The URL for the Gerrit change (nullable if not available)
+  final String? gerritUrl;
 
   /// Gets the user-friendly status for display.
   /// Returns the Gerrit status or "-" if no Gerrit change exists.
@@ -49,6 +53,12 @@ class BranchInfo {
   /// Returns the updated timestamp from Gerrit or "-" if not available.
   String getGerritDate() {
     return gerritChange?.updated ?? '-';
+  }
+
+  /// Gets the Gerrit URL for display.
+  /// Returns '-' when no URL is available.
+  String getGerritUrl() {
+    return gerritUrl ?? '-';
   }
 
   /// Checks if this branch has local changes not yet uploaded to Gerrit.

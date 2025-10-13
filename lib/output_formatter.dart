@@ -19,6 +19,7 @@ class OutputFormatter {
     bool verbose = false,
     bool showGerrit = true,
     bool showLocal = true,
+    bool showUrl = false,
     String? sortField,
     String? sortDirection,
   }) {
@@ -57,13 +58,30 @@ class OutputFormatter {
       columnWidths.addAll([12, 17]);
     }
 
+    if (showUrl) {
+      // Compute dynamic width for URL column based on content
+      var maxUrlLength = 0;
+      for (final branchInfo in branchInfoList) {
+        final url = branchInfo.getGerritUrl();
+        if (url != '-' && url.length > maxUrlLength) {
+          maxUrlLength = url.length;
+        }
+      }
+
+      // Provide reasonable bounds for URL width
+      final urlColWidth = max(20, min(120, maxUrlLength + 1));
+
+      headers.add('URL');
+      columnWidths.add(urlColWidth);
+    }
+
     // Print header
     _printTableHeader(headers, columnWidths);
     _printSeparatorLine(columnWidths);
 
     // Print each branch as a row
     for (final branchInfo in branchInfoList) {
-      _printBranchRow(branchInfo, columnWidths, showGerrit, showLocal);
+      _printBranchRow(branchInfo, columnWidths, showGerrit, showLocal, showUrl);
     }
 
     // Print summary
@@ -117,6 +135,7 @@ class OutputFormatter {
     List<int> columnWidths,
     bool showGerrit,
     bool showLocal,
+    bool showUrl,
   ) {
     final status = branchInfo.getDisplayStatus();
 
@@ -182,6 +201,17 @@ class OutputFormatter {
         _formatDate(branchInfo.getGerritDate()),
         columnWidths[colIndex + 1],
       );
+      colIndex += 2;
+    }
+
+    String? gerritUrl;
+    if (showUrl) {
+      // If the URL column was requested, allocate the next column width
+      final urlColIndex = columnWidths.length - 1;
+      gerritUrl = _padString(
+        branchInfo.getGerritUrl(),
+        columnWidths[urlColIndex],
+      );
     }
 
     // Build the row with highlighting for differences
@@ -192,6 +222,7 @@ class OutputFormatter {
       localDate,
       gerritHash,
       gerritDate,
+      gerritUrl,
       status,
       hasLocalChanges,
       hasRemoteChanges,
@@ -224,6 +255,7 @@ class OutputFormatter {
     String? localDate,
     String? gerritHash,
     String? gerritDate,
+    String? gerritUrl,
     String status,
     bool hasLocalChanges,
     bool hasRemoteChanges,
@@ -281,6 +313,13 @@ class OutputFormatter {
       } else {
         rowParts.add(gerritDate); // Default terminal color
       }
+    }
+
+    // Add URL column if provided
+    if (gerritUrl != null && gerritUrl.isNotEmpty) {
+      rowParts.add(' | ');
+      // URLs are neutral color; show as-is but truncate if needed
+      rowParts.add(gerritUrl);
     }
 
     // Print the combined row with all color segments
