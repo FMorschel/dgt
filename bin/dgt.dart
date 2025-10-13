@@ -77,6 +77,12 @@ ArgParser buildParser() {
       negatable: true,
       help: 'Filter to show only branches with local or remote differences.',
     )
+    ..addFlag(
+      'url',
+      negatable: true,
+      defaultsTo: false,
+      help: 'Show Gerrit URL column in the output.',
+    )
     ..addOption(
       'sort',
       help:
@@ -239,6 +245,7 @@ Future<void> runListCommand(
   bool showGerrit,
   bool showLocal,
   bool showTiming,
+  bool showUrl,
   FilterOptions filters,
   SortOptions sortOptions,
 ) async {
@@ -455,12 +462,23 @@ Future<void> runListCommand(
       }
 
       // Create BranchInfo object
+      // Build a Gerrit URL if possible
+      String? changeUrl;
+      if (branchData.gerritConfig.hasGerritConfig &&
+          branchData.gerritConfig.gerritIssue != null) {
+        changeUrl = GerritService.getChangeUrl(
+          branchData.gerritConfig.gerritServer,
+          branchData.gerritConfig.gerritIssue,
+        );
+      }
+
       final branchInfo = BranchInfo(
         branchName: branchData.branch,
         localHash: branchData.localHash,
         localDate: branchData.localDate,
         gerritConfig: branchData.gerritConfig,
         gerritChange: gerritChange,
+        gerritUrl: changeUrl,
       );
 
       branchInfoList.add(branchInfo);
@@ -509,6 +527,7 @@ Future<void> runListCommand(
       verbose: verbose,
       showGerrit: showGerrit,
       showLocal: showLocal,
+      showUrl: showUrl,
       sortField: sortOptions.field,
       sortDirection: sortOptions.direction,
     );
@@ -690,12 +709,30 @@ Future<void> main(List<String> arguments) async {
     // Execute the appropriate command
     switch (command) {
       case 'list':
+        // Determine if the user requested the URL column. Follow precedence:
+        // 1) CLI flag if explicitly provided, 2) config file value, 3) default
+        // false
+        bool showUrl;
+        final urlWasParsed = results.wasParsed('url');
+        if (urlWasParsed) {
+          showUrl = results.flag('url');
+        } else if (config?.showUrl != null) {
+          showUrl = config!.showUrl!;
+        } else {
+          showUrl = false;
+        }
+
+        if (verbose && config != null && config.showUrl != null) {
+          Terminal.info('[VERBOSE]   url: ${config.showUrl}');
+        }
+
         await runListCommand(
           verbose,
           repositoryPath,
           showGerrit,
           showLocal,
           showTiming,
+          showUrl,
           filters,
           sortOptions,
         );
@@ -714,8 +751,12 @@ Future<void> main(List<String> arguments) async {
             results.wasParsed('no-sort') ||
             results.wasParsed('asc') ||
             results.wasParsed('desc');
+        final hasUrlFlag = results.wasParsed('url');
 
-        if (!hasDisplayFlags && !hasFilterFlags && !hasSortFlags) {
+        if (!hasDisplayFlags &&
+            !hasFilterFlags &&
+            !hasSortFlags &&
+            !hasUrlFlag) {
           Terminal.error(
             'Error: You must specify at least one flag for the config command.',
           );
@@ -732,8 +773,8 @@ Future<void> main(List<String> arguments) async {
           Terminal.info('');
           Terminal.info(
             'Use --gerrit/--no-gerrit, --local/--no-local, --status, '
-            '--since, --before, --diverged, --sort, --asc, --desc to set '
-            'defaults.',
+            '--since, --before, --diverged, --sort, --asc, --desc  or --url to '
+            'set defaults.',
           );
           return;
         }
@@ -744,6 +785,9 @@ Future<void> main(List<String> arguments) async {
             : null;
         final configShowLocal = results.wasParsed('local')
             ? results.flag('local')
+            : null;
+        final configShowUrl = results.wasParsed('url')
+            ? results.flag('url')
             : null;
         final configStatusFilters = results.wasParsed('status')
             ? results.multiOption('status')
@@ -779,6 +823,7 @@ Future<void> main(List<String> arguments) async {
           verbose,
           configShowGerrit,
           configShowLocal,
+          configShowUrl,
           configStatusFilters,
           configSince,
           configBefore,

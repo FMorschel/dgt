@@ -121,6 +121,21 @@ dart pub global run dgt -v -t  # Verbose output with timing
 dart pub global run dgt -p /path/to/repo --timing  # Timing for specific repo
 ```
 
+### Show Gerrit URL column
+
+Include the Gerrit change URL in the table output:
+
+```bash
+dart pub global run dgt --url
+```
+
+Save URL column as a default in your config:
+
+```bash
+# Save the URL column as a default (stored in ~/.dgt/.config)
+dart pub global run dgt config --url
+```
+
 ### Specify Repository Path
 
 Analyze a repository in a different directory:

@@ -6,6 +6,7 @@ Future<void> runConfigCommand(
   bool verbose,
   bool? showGerrit,
   bool? showLocal,
+  bool? showUrl,
   List<String>? filterStatuses,
   String? filterSince,
   String? filterBefore,
@@ -23,6 +24,7 @@ Future<void> runConfigCommand(
     final config = DgtConfig(
       showGerrit: showGerrit ?? existingConfig?.showGerrit,
       showLocal: showLocal ?? existingConfig?.showLocal,
+      showUrl: showUrl ?? existingConfig?.showUrl,
       filterStatuses: filterStatuses ?? existingConfig?.filterStatuses,
       filterSince: filterSince ?? existingConfig?.filterSince,
       filterBefore: filterBefore ?? existingConfig?.filterBefore,
@@ -65,6 +67,9 @@ Future<void> runConfigCommand(
     }
     if (config.sortDirection != null) {
       Terminal.info('  sortDirection: ${config.sortDirection}');
+    }
+    if (config.showUrl != null) {
+      Terminal.info('  url: ${config.showUrl}');
     }
     Terminal.info('');
     Terminal.info('These settings will be used as defaults for future runs.');

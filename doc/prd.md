@@ -34,26 +34,6 @@ This leads to inefficiency and potential oversight of important review status ch
 - **Primary**: Dart SDK contributors who use Gerrit for code reviews
 - **Secondary**: Any developer working with Gerrit-based workflows
 
-## Requirements
-
-The following requirements capture user requests and open issues identified for the project (recorded on 2025-10-10):
-
-1. Sort output
-
-   - Description: Users must be able to sort the tool's output by one or more fields to make scanning large lists easier.
-   - Acceptance criteria:
-     - Provide a CLI option to sort by: date (local or Gerrit), status, divergences (missing push/pull), and branch name.
-     - Support ascending and descending order.
-     - Sorting should be stable and performant for typical repositories.
-
-2. Filter output
-
-   - Description: Users must be able to filter the output to focus on branches of interest.
-   - Acceptance criteria:
-     - Provide CLI options to filter by status (WIP, Active, Merge conflict, Merged).
-     - Provide date-based filters: `--since <date>` and `--before <date>` to limit by last commit date.
-     - Filters may be combined (e.g., status + date range) and should be applied efficiently.
-
 ## Features
 
 ### Core Features
@@ -300,8 +280,36 @@ Remote changes exist when: gerritsquashhash ≠ gerrit_current_revision
 
 ## Future Enhancements
 
-1. **Multi-Repository Support**: Handle multiple Git repositories
-2. **Notification System**: Alert on status changes
-3. **Integration**: VS Code extension or Git hooks
-4. **Enhanced Output**: JSON format option, customizable color schemes
-5. **Change Details**: Show review comments count, approval status
+1. **Notification System**: Alert on status changes
+2. **Integration**: VS Code extension or Git hooks
+3. **Enhanced Output**: JSON format option, customizable color schemes
+4. **Change Details**: Show review comments count, approval status
+
+## Requirements
+
+The following requirements capture user requests and open issues identified for the project (recorded on 2025-10-10):
+
+1. Sort output
+
+   - Description: Users must be able to sort the tool's output by one or more fields to make scanning large lists easier.
+   - Acceptance criteria:
+     - Provide a CLI option to sort by: date (local or Gerrit), status, divergences (missing push/pull), and branch name.
+     - Support ascending and descending order.
+     - Sorting should be stable and performant for typical repositories.
+
+2. Filter output
+
+   - Description: Users must be able to filter the output to focus on branches of interest.
+   - Acceptance criteria:
+     - Provide CLI options to filter by status (WIP, Active, Merge conflict, Merged).
+     - Provide date-based filters: `--since <date>` and `--before <date>` to limit by last commit date.
+     - Filters may be combined (e.g., status + date range) and should be applied efficiently.
+
+3. Show Gerrit URL column
+
+   - Description: Users should be able to display a clickable Gerrit change URL for each branch in the output table.
+   - Acceptance criteria:
+     - Provide a CLI option to include a "URL" column in the output.
+     - The URL should link directly to the Gerrit change page for each branch (when available).
+     - The column should be shown alongside branch name and status, and may be toggled on/off for space efficiency.
+     - Handle branches without Gerrit changes gracefully (show empty or placeholder).

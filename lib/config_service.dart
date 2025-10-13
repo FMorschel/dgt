@@ -6,6 +6,7 @@ class DgtConfig {
   DgtConfig({
     this.showLocal,
     this.showGerrit,
+    this.showUrl,
     this.filterStatuses,
     this.filterSince,
     this.filterBefore,
@@ -18,6 +19,7 @@ class DgtConfig {
     return DgtConfig(
       showLocal: json['local'] as bool?,
       showGerrit: json['gerrit'] as bool?,
+      showUrl: json['url'] as bool?,
       filterStatuses: (json['filterStatuses'] as List<dynamic>?)
           ?.map((e) => e as String)
           .toList(),
@@ -31,6 +33,7 @@ class DgtConfig {
 
   final bool? showLocal;
   final bool? showGerrit;
+  final bool? showUrl;
   final List<String>? filterStatuses;
   final String? filterSince;
   final String? filterBefore;
@@ -42,6 +45,7 @@ class DgtConfig {
     return {
       if (showLocal != null) 'local': showLocal,
       if (showGerrit != null) 'gerrit': showGerrit,
+      if (showUrl != null) 'url': showUrl,
       if (filterStatuses != null && filterStatuses!.isNotEmpty)
         'filterStatuses': filterStatuses,
       if (filterSince != null) 'filterSince': filterSince,
