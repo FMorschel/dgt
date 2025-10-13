@@ -4,6 +4,7 @@ import 'package:args/args.dart';
 import 'package:dgt/branch_info.dart';
 import 'package:dgt/config_command.dart';
 import 'package:dgt/config_service.dart';
+import 'package:dgt/display_options.dart';
 import 'package:dgt/filtering.dart';
 import 'package:dgt/gerrit_service.dart';
 import 'package:dgt/git_service.dart';
@@ -242,16 +243,13 @@ void printUsage(ArgParser argParser) {
 Future<void> runListCommand(
   bool verbose,
   String? repositoryPath,
-  bool showGerrit,
-  bool showLocal,
-  bool showTiming,
-  bool showUrl,
+  DisplayOptions displayOptions,
   FilterOptions filters,
   SortOptions sortOptions,
 ) async {
   // Initialize performance tracker if timing is requested
   PerformanceTracker? tracker;
-  if (showTiming) {
+  if (displayOptions.showTiming) {
     tracker = PerformanceTracker();
   }
 
@@ -523,18 +521,16 @@ Future<void> runListCommand(
 
     // Display results in a formatted table
     Terminal.info('');
-    OutputFormatter.displayBranchTable(
+    final formatter = OutputFormatter(displayOptions);
+    formatter.displayBranchTable(
       branchInfoList,
       verbose: verbose,
-      showGerrit: showGerrit,
-      showLocal: showLocal,
-      showUrl: showUrl,
       sortField: sortOptions.field,
       sortDirection: sortOptions.direction,
     );
 
     // Display performance summary if timing was requested
-    if (showTiming && tracker != null) {
+    if (displayOptions.showTiming && tracker != null) {
       OutputFormatter.displayPerformanceSummary(tracker);
     }
   } catch (e) {
@@ -562,46 +558,12 @@ Future<void> main(List<String> arguments) async {
     }
 
     final verbose = results.flag('verbose');
-    final showTiming = results.flag('timing');
 
     // Get the repository path if specified
     final repositoryPath = results.option('path');
 
     // Load config from ~/.dgt/.config
     final config = await ConfigService.readConfig(verbose: verbose);
-
-    // Determine display options with priority:
-    // 1. Command-line flags (if explicitly set)
-    // 2. Config file settings (if available)
-    // 3. Default values (true for both)
-    bool showGerrit;
-    bool showLocal;
-
-    // Check if flags were explicitly provided by the user
-    final gerritWasParsed = results.wasParsed('gerrit');
-    final localWasParsed = results.wasParsed('local');
-
-    if (gerritWasParsed) {
-      // Command-line flag takes priority
-      showGerrit = results.flag('gerrit');
-    } else if (config?.showGerrit != null) {
-      // Config file overrides default
-      showGerrit = config!.showGerrit!;
-    } else {
-      // Use default value
-      showGerrit = true;
-    }
-
-    if (localWasParsed) {
-      // Command-line flag takes priority
-      showLocal = results.flag('local');
-    } else if (config?.showLocal != null) {
-      // Config file overrides default
-      showLocal = config!.showLocal!;
-    } else {
-      // Use default value
-      showLocal = true;
-    }
 
     if (verbose && config != null) {
       Terminal.info('[VERBOSE] Using config file settings:');
@@ -610,6 +572,9 @@ Future<void> main(List<String> arguments) async {
       }
       if (config.showGerrit != null) {
         Terminal.info('[VERBOSE]   gerrit: ${config.showGerrit}');
+      }
+      if (config.showUrl != null) {
+        Terminal.info('[VERBOSE]   url: ${config.showUrl}');
       }
       if (config.filterStatuses != null && config.filterStatuses!.isNotEmpty) {
         Terminal.info('[VERBOSE]   filterStatuses: ${config.filterStatuses}');
@@ -631,34 +596,25 @@ Future<void> main(List<String> arguments) async {
       }
     }
 
-    // Parse filter options from CLI
-    final cliStatusFilters = results.multiOption('status');
-    final cliSinceStr = results.option('since');
-    final cliBeforeStr = results.option('before');
-    final cliDivergedFilter = results.wasParsed('diverged')
-        ? results.flag('diverged')
-        : null;
+    // Use centralized resolution helpers for filters and sort options
+    final statusFilters = config.resolveMultiOption(results, 'status', []);
+    final sinceStr = config.resolveOption(results, 'since', null);
+    final beforeStr = config.resolveOption(results, 'before', null);
+    final divergedFilter = config.resolveFlag(results, 'diverged', false);
 
-    // Parse sort options from CLI
-    final cliSortField = results.option('sort');
-    String? cliSortDirection;
+    // Resolve sort options using centralized helpers
+    final sortField = config.resolveOption(results, 'sort', null);
+
+    // Handle sort direction (asc/desc flags)
+    String? sortDirection;
     if (results.wasParsed('desc')) {
-      cliSortDirection = 'desc';
+      sortDirection = 'desc';
     } else if (results.wasParsed('asc')) {
-      cliSortDirection = 'asc';
+      sortDirection = 'asc';
+    } else {
+      // Use config file value if no CLI flag provided
+      sortDirection = config?.sortDirection;
     }
-
-    // Merge CLI filters with config defaults (CLI takes precedence)
-    final statusFilters = cliStatusFilters.isNotEmpty
-        ? cliStatusFilters
-        : (config?.filterStatuses ?? []);
-    final sinceStr = cliSinceStr ?? config?.filterSince;
-    final beforeStr = cliBeforeStr ?? config?.filterBefore;
-    final divergedFilter = cliDivergedFilter ?? config?.filterDiverged;
-
-    // Merge CLI sort options with config defaults (CLI takes precedence)
-    final sortField = cliSortField ?? config?.sortField;
-    final sortDirection = cliSortDirection ?? config?.sortDirection;
 
     // Validate status filters (from CLI or config file)
     try {
@@ -710,30 +666,17 @@ Future<void> main(List<String> arguments) async {
     // Execute the appropriate command
     switch (command) {
       case 'list':
-        // Determine if the user requested the URL column. Follow precedence:
-        // 1) CLI flag if explicitly provided, 2) config file value, 3) default
-        // false
-        bool showUrl;
-        final urlWasParsed = results.wasParsed('url');
-        if (urlWasParsed) {
-          showUrl = results.flag('url');
-        } else if (config?.showUrl != null) {
-          showUrl = config!.showUrl!;
-        } else {
-          showUrl = false;
-        }
-
-        if (verbose && config != null && config.showUrl != null) {
-          Terminal.info('[VERBOSE]   url: ${config.showUrl}');
-        }
+        // Create DisplayOptions instance using factory constructor
+        // which resolves values from CLI flags, config file, and defaults
+        final displayOptions = DisplayOptions.resolve(
+          results: results,
+          config: config,
+        );
 
         await runListCommand(
           verbose,
           repositoryPath,
-          showGerrit,
-          showLocal,
-          showTiming,
-          showUrl,
+          displayOptions,
           filters,
           sortOptions,
         );
@@ -741,7 +684,9 @@ Future<void> main(List<String> arguments) async {
         // For the config command, user must explicitly provide at least one
         // flag
         final hasDisplayFlags =
-            results.wasParsed('gerrit') || results.wasParsed('local');
+            results.wasParsed('gerrit') ||
+            results.wasParsed('local') ||
+            results.wasParsed('url');
         final hasFilterFlags =
             results.wasParsed('status') ||
             results.wasParsed('since') ||
@@ -752,12 +697,8 @@ Future<void> main(List<String> arguments) async {
             results.wasParsed('no-sort') ||
             results.wasParsed('asc') ||
             results.wasParsed('desc');
-        final hasUrlFlag = results.wasParsed('url');
 
-        if (!hasDisplayFlags &&
-            !hasFilterFlags &&
-            !hasSortFlags &&
-            !hasUrlFlag) {
+        if (!hasDisplayFlags && !hasFilterFlags && !hasSortFlags) {
           Terminal.error(
             'Error: You must specify at least one flag for the config command.',
           );
@@ -773,64 +714,34 @@ Future<void> main(List<String> arguments) async {
           Terminal.info('  dgt config --sort local-date --desc');
           Terminal.info('');
           Terminal.info(
-            'Use --gerrit/--no-gerrit, --local/--no-local, --status, '
-            '--since, --before, --diverged, --sort, --asc, --desc  or --url to '
+            'Use --gerrit/--no-gerrit, --local/--no-local, --url/--no-url, '
+            '--status, --since, --before, --diverged, --sort, --asc, --desc to '
             'set defaults.',
           );
           return;
         }
 
-        // Only save values that were explicitly provided
-        final configShowGerrit = results.wasParsed('gerrit')
-            ? results.flag('gerrit')
-            : null;
-        final configShowLocal = results.wasParsed('local')
-            ? results.flag('local')
-            : null;
-        final configShowUrl = results.wasParsed('url')
-            ? results.flag('url')
-            : null;
-        final configStatusFilters = results.wasParsed('status')
-            ? results.multiOption('status')
-            : null;
-        final configSince = results.wasParsed('since')
-            ? results.option('since')
-            : null;
-        final configBefore = results.wasParsed('before')
-            ? results.option('before')
-            : null;
-        final configDiverged = results.wasParsed('diverged')
-            ? results.flag('diverged')
-            : null;
-
-        // Handle --no-sort flag (clears sort configuration)
-        String? configSortField;
-        String? configSortDirection;
-        if (results.wasParsed('no-sort') && results.flag('no-sort')) {
-          // User wants to clear sort configuration
-          configSortField = ''; // Empty string signals to clear
-          configSortDirection = '';
-        } else if (results.wasParsed('sort')) {
-          configSortField = results.option('sort');
-          // Only set direction if sort field is also set
-          if (results.wasParsed('desc')) {
-            configSortDirection = 'desc';
-          } else if (results.wasParsed('asc')) {
-            configSortDirection = 'asc';
-          }
+        // Validate that asc and desc are not both specified
+        if (results.wasParsed('asc') && results.wasParsed('desc')) {
+          Terminal.error('Error: Cannot specify both --asc and --desc flags.');
+          Terminal.info('Please use only one sort direction flag.');
+          return;
         }
+
+        // Extract config values from parsed arguments
+        final configToSave = DgtConfig.fromArgResults(results);
 
         await runConfigCommand(
           verbose,
-          configShowGerrit,
-          configShowLocal,
-          configShowUrl,
-          configStatusFilters,
-          configSince,
-          configBefore,
-          configDiverged,
-          configSortField,
-          configSortDirection,
+          configToSave.showGerrit,
+          configToSave.showLocal,
+          configToSave.showUrl,
+          configToSave.filterStatuses,
+          configToSave.filterSince,
+          configToSave.filterBefore,
+          configToSave.filterDiverged,
+          configToSave.sortField,
+          configToSave.sortDirection,
         );
       default:
         Terminal.error('Unknown command: $command');

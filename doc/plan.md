@@ -308,6 +308,46 @@ This plan outlines the steps to build a Minimum Viable Product (MVP) for DGT - a
 - ❌ Configuration file support
 - ❌ Notification system
 
+### Phase 16: Centralized Flag Resolution
+
+**Goal**: Reduce duplication in flag precedence handling by centralizing the resolution logic into a reusable helper method in `ConfigService`.
+
+**Current Problem**: Flag precedence logic (CLI flags > Config file > Built-in defaults) is duplicated across multiple flags in `bin/dgt.dart`, making the code verbose and harder to maintain.
+
+**Implementation Steps**:
+
+- [x] Persisted config lives in the user's config file (for example, `~/.dgt/.config`)
+- [ ] Add centralized flag resolution helper to `ConfigService`:
+  - [ ] Create `resolveFlag(ArgResults argResults, String flagName, bool defaultValue)` method
+    - Returns: CLI flag value if explicitly provided, else config file value, else default value
+  - [ ] Create `resolveOption(ArgResults argResults, String optionName, T? defaultValue)` method
+    - Returns: CLI option value if explicitly provided, else config file value, else default value
+  - [ ] Create `resolveMultiOption(ArgResults argResults, String optionName, List<T> defaultValue)` method
+    - Returns: CLI multi-option values if explicitly provided, else config file values, else default value
+- [ ] Refactor `bin/dgt.dart` to use centralized helpers:
+  - [ ] Replace precedence code for `--timing` flag with `config.resolveFlag(argResults, 'timing', false)`
+  - [ ] Replace precedence code for `--url` flag with `config.resolveFlag(argResults, 'url', false)`
+  - [ ] Replace precedence code for `--diverged` flag with `config.resolveFlag(argResults, 'diverged', false)`
+  - [ ] Replace precedence code for `--sort` option with `config.resolveOption(argResults, 'sort', null)`
+  - [ ] Replace precedence code for `--asc`/`--desc` with `config.resolveFlag(argResults, 'asc'/'desc', false)`
+  - [ ] Replace precedence code for `--status` multi-option with `config.resolveMultiOption(argResults, 'status', [])`
+  - [ ] Replace precedence code for `--since`/`--before` options with `config.resolveOption()`
+- [ ] Ensure resolution logic handles wasExplicitlyProvided check correctly:
+  - CLI flags/options should only override config when user explicitly provides them
+  - Use `argResults.wasParsed(flagName)` to detect explicit CLI usage
+- [ ] Add helper method documentation with examples
+- [ ] Test precedence behavior:
+  - [ ] CLI flag overrides config value
+  - [ ] Config value used when no CLI flag provided
+  - [ ] Built-in default used when neither CLI nor config provided
+
+**Benefits**:
+
+- Eliminates code duplication across flag handling
+- Makes it trivial to add new configurable flags in the future
+- Centralizes precedence rules in one maintainable location
+- Keeps `bin/dgt.dart` cleaner and more readable
+
 ---
 
 ## Key Technical Details

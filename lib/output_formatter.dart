@@ -1,25 +1,27 @@
 import 'dart:math';
 
 import 'branch_info.dart';
+import 'display_options.dart';
 import 'performance_tracker.dart';
 import 'terminal.dart';
 
 /// Handles formatting and displaying branch information in a table format.
 class OutputFormatter {
+  /// Creates a new OutputFormatter with the specified display options.
+  const OutputFormatter(this.displayOptions);
+
+  /// Configuration for which columns to display.
+  final DisplayOptions displayOptions;
+
   /// Formats and displays a list of branch information.
   ///
   /// [branchInfoList] - List of BranchInfo objects to display
   /// [verbose] - Whether to show verbose output
-  /// [showGerrit] - Whether to display Gerrit hash and date columns
-  /// [showLocal] - Whether to display local hash and date columns
   /// [sortField] - The field used for sorting (if any)
   /// [sortDirection] - The direction used for sorting (if any)
-  static void displayBranchTable(
+  void displayBranchTable(
     List<BranchInfo> branchInfoList, {
     bool verbose = false,
-    bool showGerrit = true,
-    bool showLocal = true,
-    bool showUrl = false,
     String? sortField,
     String? sortDirection,
   }) {
@@ -48,17 +50,17 @@ class OutputFormatter {
     final headers = <String>['Branch Name', 'Status'];
     final columnWidths = <int>[branchNameColWidth, 17];
 
-    if (showLocal) {
+    if (displayOptions.showLocal) {
       headers.addAll(['Local Hash', 'Local Date']);
       columnWidths.addAll([12, 17]);
     }
 
-    if (showGerrit) {
+    if (displayOptions.showGerrit) {
       headers.addAll(['Gerrit Hash', 'Gerrit Date']);
       columnWidths.addAll([12, 17]);
     }
 
-    if (showUrl) {
+    if (displayOptions.showUrl) {
       // Compute dynamic width for URL column based on content
       var maxUrlLength = 0;
       for (final branchInfo in branchInfoList) {
@@ -80,8 +82,9 @@ class OutputFormatter {
     _printSeparatorLine(columnWidths);
 
     // Print each branch as a row
+    // Print each branch as a row
     for (final branchInfo in branchInfoList) {
-      _printBranchRow(branchInfo, columnWidths, showGerrit, showLocal, showUrl);
+      _printBranchRow(branchInfo, columnWidths);
     }
 
     // Print summary
@@ -91,7 +94,7 @@ class OutputFormatter {
   }
 
   /// Prints the table header row.
-  static void _printTableHeader(List<String> headers, List<int> columnWidths) {
+  void _printTableHeader(List<String> headers, List<int> columnWidths) {
     final headerRow = StringBuffer();
     for (var i = 0; i < headers.length; i++) {
       headerRow.write(_padString(headers[i], columnWidths[i]));
@@ -103,7 +106,7 @@ class OutputFormatter {
   }
 
   /// Prints a separator line between header and data.
-  static void _printSeparatorLine(List<int> columnWidths) {
+  void _printSeparatorLine(List<int> columnWidths) {
     final separator = StringBuffer();
     for (var i = 0; i < columnWidths.length; i++) {
       separator.write('-' * columnWidths[i]);
@@ -131,13 +134,7 @@ class OutputFormatter {
   /// The highlighting logic helps users quickly identify:
   /// - Branches where local changes need to be uploaded to Gerrit
   /// - Branches where Gerrit has updates that need to be pulled/rebased locally
-  static void _printBranchRow(
-    BranchInfo branchInfo,
-    List<int> columnWidths,
-    bool showGerrit,
-    bool showLocal,
-    bool showUrl,
-  ) {
+  void _printBranchRow(BranchInfo branchInfo, List<int> columnWidths) {
     final status = branchInfo.getDisplayStatus();
 
     // Check for sync state differences using Git config metadata
@@ -179,7 +176,7 @@ class OutputFormatter {
 
     String? localHash;
     String? localDate;
-    if (showLocal) {
+    if (displayOptions.showLocal) {
       localHash = _padString(
         _truncateHash(branchInfo.localHash),
         columnWidths[colIndex],
@@ -193,7 +190,7 @@ class OutputFormatter {
 
     String? gerritHash;
     String? gerritDate;
-    if (showGerrit) {
+    if (displayOptions.showGerrit) {
       gerritHash = _padString(
         _truncateHash(branchInfo.getGerritHash()),
         columnWidths[colIndex],
@@ -206,7 +203,7 @@ class OutputFormatter {
     }
 
     String? gerritUrl;
-    if (showUrl) {
+    if (displayOptions.showUrl) {
       // If the URL column was requested, allocate the next column width
       final urlColIndex = columnWidths.length - 1;
       gerritUrl = _padString(
@@ -227,8 +224,6 @@ class OutputFormatter {
       status,
       hasLocalChanges,
       hasRemoteChanges,
-      showLocal,
-      showGerrit,
     );
   }
 
@@ -249,7 +244,7 @@ class OutputFormatter {
   ///
   /// [hasLocalChanges] - True when local HEAD ≠ last-upload-hash
   /// [hasRemoteChanges] - True when gerritsquashhash ≠ Gerrit current_revision
-  static void _printRowWithHighlighting(
+  void _printRowWithHighlighting(
     String branchName,
     String statusStr,
     String? localHash,
@@ -260,8 +255,6 @@ class OutputFormatter {
     String status,
     bool hasLocalChanges,
     bool hasRemoteChanges,
-    bool showLocal,
-    bool showGerrit,
   ) {
     // Get the appropriate color function for the status
     var colorText = _getStatusColorTextFunction(status);
@@ -275,7 +268,7 @@ class OutputFormatter {
     rowParts.add(colorText(statusStr));
 
     // Add local hash and date if requested (in default color or yellow)
-    if (showLocal && localHash != null && localDate != null) {
+    if (displayOptions.showLocal && localHash != null && localDate != null) {
       rowParts.add(' | '); // Separator in default color
 
       // Local hash - highlight in yellow if there are unpushed local changes
@@ -296,7 +289,7 @@ class OutputFormatter {
     }
 
     // Add Gerrit hash and date if requested (in default color or yellow)
-    if (showGerrit && gerritHash != null && gerritDate != null) {
+    if (displayOptions.showGerrit && gerritHash != null && gerritDate != null) {
       rowParts.add(' | '); // Separator in default color
 
       // Gerrit hash - highlight in yellow if Gerrit has remote updates
@@ -328,7 +321,7 @@ class OutputFormatter {
   }
 
   /// Gets the color text function for a status.
-  static String Function(String) _getStatusColorTextFunction(String status) {
+  String Function(String) _getStatusColorTextFunction(String status) {
     switch (status) {
       case 'Active':
         return Terminal.greenText;
@@ -344,7 +337,7 @@ class OutputFormatter {
   }
 
   /// Pads a string to the specified width.
-  static String _padString(String text, int width) {
+  String _padString(String text, int width) {
     if (text.length >= width) {
       return text.substring(0, width);
     }
@@ -354,7 +347,7 @@ class OutputFormatter {
   /// Truncates a commit hash for display.
   ///
   /// Shows first 8 characters of the hash.
-  static String _truncateHash(String hash) {
+  String _truncateHash(String hash) {
     if (hash == '-' || hash.length <= 8) {
       return hash;
     }
@@ -374,7 +367,7 @@ class OutputFormatter {
   /// [dateStr] - The date string to format
   /// Returns the formatted date string or "-" if the input is "-".
   /// If parsing fails, returns the original string truncated to 16 characters.
-  static String _formatDate(String dateStr) {
+  String _formatDate(String dateStr) {
     if (dateStr == '-') {
       return '-';
     }
