@@ -285,6 +285,24 @@ Remote changes exist when: gerritsquashhash ≠ gerrit_current_revision
 3. **Enhanced Output**: JSON format option, customizable color schemes
 4. **Change Details**: Show review comments count, approval status
 
+## Avoiding CLI clutter with persistent config defaults
+
+Developers who run `dgt` frequently on long-lived branches such as `main` may prefer not to pass the same display, filter, or sort flags every time. To reduce repetitive CLI flags and avoid cluttering command-history (or leaking flags when switching branches), `dgt` supports persisting default flag values via the `dgt config` command or a dedicated configuration helper in the codebase.
+
+Key points:
+
+- Persisted values live in the user's config file (for example, `~/.dgt/.config`) and are applied automatically when running `dgt`.
+- Precedence rules: explicit CLI flags always override config values, which in turn override built-in defaults. This gives users quick one-off control while preserving a preferred default setup.
+- Recommended usage examples:
+
+  - Save a preferred display layout: `dgt config --no-gerrit --local`
+  - Persist commonly used filters: `dgt config --status Active --diverged`
+  - Save a sort preference: `dgt config --sort local-date --desc`
+
+Implementation note:
+
+- The codebase already exposes a `config` command to set these values. For consistency and to avoid duplicating precedence logic throughout the CLI entrypoint, consider adding a small helper on the `ConfigService` (for example, `ConfigService.resolveFlag`) that centralizes the precedence resolution (CLI > config file > default). This helper can accept the parsed `ArgResults`, the config object, the flag name, and the default value, and return the resolved boolean/string value. Using this helper everywhere the tool needs to pick a runtime flag keeps `bin/dgt.dart` minimal and reduces the risk of inconsistent behavior.
+
 ## Requirements
 
 The following requirements capture user requests and open issues identified for the project (recorded on 2025-10-10):
