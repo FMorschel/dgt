@@ -282,8 +282,15 @@ class ConfigService {
 
       if (verbose) {
         print('[VERBOSE] Loaded config from: $configPath');
-        print('[VERBOSE]   local: ${config.showLocal}');
-        print('[VERBOSE]   gerrit: ${config.showGerrit}');
+        if (config.showLocal != null) {
+          print('[VERBOSE]   local: ${config.showLocal}');
+        }
+        if (config.showGerrit != null) {
+          print('[VERBOSE]   gerrit: ${config.showGerrit}');
+        }
+        if (config.showUrl != null) {
+          print('[VERBOSE]   url: ${config.showUrl}');
+        }
         if (config.filterStatuses != null &&
             config.filterStatuses!.isNotEmpty) {
           print('[VERBOSE]   filterStatuses: ${config.filterStatuses}');
