@@ -59,8 +59,8 @@ ArgParser buildParser() {
       'status',
       help:
           'Filter branches by Gerrit status. '
-          'Allowed: wip, active, merged, conflict',
-      allowed: ['wip', 'active', 'merged', 'conflict'],
+          'Allowed: wip, active, merged, abandoned, conflict',
+      allowed: ['wip', 'active', 'merged', 'abandoned', 'conflict'],
       valueHelp: 'status',
     )
     ..addOption(
@@ -206,6 +206,7 @@ void printUsage(ArgParser argParser) {
   Terminal.info('  wip       - Work in Progress');
   Terminal.info('  active    - Ready for review');
   Terminal.info('  merged    - Successfully merged');
+  Terminal.info('  abandoned - Abandoned changes');
   Terminal.info('  conflict  - Has merge conflicts');
   Terminal.info('');
   Terminal.info('Config command examples:');
@@ -759,6 +760,7 @@ Future<void> main(List<String> arguments) async {
       Terminal.info('  wip       - Work in Progress');
       Terminal.info('  active    - Ready for review');
       Terminal.info('  merged    - Successfully merged');
+      Terminal.info('  abandoned - Abandoned changes');
       Terminal.info('  conflict  - Has merge conflicts');
       Terminal.info('');
       Terminal.info('Run "dgt --help" for more information.');
