@@ -17,6 +17,7 @@ Introduced CLI-friendly kebab-case values that map to display values:
 | `wip` | WIP | Work in Progress |
 | `active` | Active | Ready for review |
 | `merged` | Merged | Successfully merged |
+| `abandoned` | Abandoned | Abandoned changes |
 | `conflict` | Merge conflict | Has merge conflicts |
 
 ## Examples
@@ -50,6 +51,7 @@ const Map<String, String> statusMapping = {
   'wip': 'WIP',
   'active': 'Active',
   'merged': 'Merged',
+  'abandoned': 'Abandoned',
   'conflict': 'Merge conflict',
 };
 ```
@@ -60,8 +62,8 @@ const Map<String, String> statusMapping = {
 ..addMultiOption(
   'status',
   help: 'Filter branches by Gerrit status. '
-      'Allowed: wip, active, merged, conflict',
-  allowed: ['wip', 'active', 'merged', 'conflict'],
+      'Allowed: wip, active, merged, abandoned, conflict',
+  allowed: ['wip', 'active', 'merged', 'abandoned', 'conflict'],
   valueHelp: 'status',
 )
 ```

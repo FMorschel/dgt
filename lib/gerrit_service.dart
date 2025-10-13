@@ -3,6 +3,39 @@ import 'dart:isolate';
 
 import 'package:http/http.dart' as http;
 
+/// Represents the LGTM (Code-Review) status of a Gerrit change.
+class LgtmStatus {
+  LgtmStatus({
+    required this.approved,
+    required this.positiveVotes,
+    required this.negativeVotes,
+  });
+
+  /// Creates an LgtmStatus with no votes
+  factory LgtmStatus.empty() {
+    return LgtmStatus(approved: false, positiveVotes: 0, negativeVotes: 0);
+  }
+
+  /// Whether the change has been approved (has 'approved' key in Code-Review)
+  final bool approved;
+
+  /// Number of positive Code-Review votes (value > 0)
+  final int positiveVotes;
+
+  /// Number of negative Code-Review votes (value < 0)
+  final int negativeVotes;
+
+  @override
+  String toString() {
+    return switch ((positiveVotes, negativeVotes)) {
+      (>= 1, < 1) => '+$positiveVotes',
+      (< 1, >= 1) => '-$negativeVotes',
+      (0, 0) => '',
+      _ => '+$positiveVotes/-$negativeVotes',
+    };
+  }
+}
+
 /// Represents a Gerrit change with its status and metadata.
 class GerritChange {
   GerritChange({
@@ -12,6 +45,8 @@ class GerritChange {
     required this.mergeable,
     required this.updated,
     required this.currentRevision,
+    required this.lgtm,
+    required this.unsent,
   });
 
   /// Creates a GerritChange from a JSON map.
@@ -23,6 +58,49 @@ class GerritChange {
       currentRevision = currentRevisionKey;
     }
 
+    // Extract LGTM status from labels -> Code-Review
+    var lgtmStatus = LgtmStatus.empty();
+    final labels = json['labels'] as Map<String, dynamic>?;
+    if (labels != null) {
+      final codeReview = labels['Code-Review'] as Map<String, dynamic>?;
+      if (codeReview != null) {
+        final hasApproved = codeReview.containsKey('approved');
+
+        // Count positive and negative votes from 'all' array
+        var positiveCount = 0;
+        var negativeCount = 0;
+        final allVotes = codeReview['all'] as List<dynamic>?;
+        if (allVotes != null) {
+          for (final vote in allVotes) {
+            if (vote is Map<String, dynamic>) {
+              final value = vote['value'];
+              if (value is num) {
+                if (value > 0) {
+                  positiveCount++;
+                } else if (value < 0) {
+                  negativeCount++;
+                }
+              }
+            }
+          }
+        }
+
+        lgtmStatus = LgtmStatus(
+          approved: hasApproved,
+          positiveVotes: positiveCount,
+          negativeVotes: negativeCount,
+        );
+      }
+    }
+
+    // Check if there are reviewers (unsent to reviewers)
+    var unsent = false;
+    final reviewers = json['reviewers'] as Map<String, dynamic>?;
+    if (reviewers != null) {
+      final reviewerList = reviewers['REVIEWER'] as List<dynamic>?;
+      unsent = reviewerList != null && reviewerList.isNotEmpty;
+    }
+
     return GerritChange(
       changeId: json['change_id'] as String,
       status: json['status'] as String,
@@ -30,6 +108,8 @@ class GerritChange {
       mergeable: json['mergeable'] as bool? ?? true,
       updated: json['updated'] as String,
       currentRevision: currentRevision,
+      lgtm: lgtmStatus,
+      unsent: unsent,
     );
   }
 
@@ -51,31 +131,55 @@ class GerritChange {
   /// The current revision hash (commit SHA)
   final String? currentRevision;
 
+  /// Code-Review status including approval and vote counts
+  final LgtmStatus lgtm;
+
+  /// Whether the change has been sent to reviewers (has REVIEWER list)
+  final bool unsent;
+
   /// Maps the Gerrit change to a user-friendly status string.
   ///
   /// Priority order (when multiple conditions match):
   /// 1. Merged (highest priority)
-  /// 2. Merge conflict
-  /// 3. WIP
-  /// 4. Active
+  /// 2. Abandoned
+  /// 3. Merge conflict
+  /// 4. WIP
+  /// 5. Active
   String getUserFriendlyStatus() {
     // Priority 1: Merged
     if (status == 'MERGED') {
       return 'Merged';
     }
 
-    // Priority 2: Merge conflict
+    // Priority 2: Abandoned
+    if (status == 'ABANDONED') {
+      return 'Abandoned';
+    }
+
+    // Priority 3: Merge conflict
     if (!mergeable) {
+      if (workInProgress) {
+        return 'Merge conflict (WIP)';
+      } else if (lgtm.approved) {
+        return 'Merge conflict (LGTM $lgtm)';
+      } else if (unsent) {
+        return 'Merge conflict (Unsent)';
+      }
       return 'Merge conflict';
     }
 
-    // Priority 3: WIP
+    // Priority 4: WIP
     if (workInProgress) {
       return 'WIP';
     }
 
-    // Priority 4: Active (NEW status and not WIP)
+    // Priority 5: Active (NEW status and not WIP)
     if (status == 'NEW') {
+      if (lgtm.approved) {
+        return 'Active (LGTM $lgtm)';
+      } else if (unsent) {
+        return 'Active (Unsent)';
+      }
       return 'Active';
     }
 
@@ -144,7 +248,9 @@ class GerritService {
       final queryParams = issueNumbers
           .map((String issue) => 'q=$issue')
           .join('&');
-      final url = '$serverUrl/changes/?$queryParams&o=CURRENT_REVISION';
+      final url =
+          '$serverUrl/changes/?$queryParams&o=CURRENT_REVISION'
+          '&o=DETAILED_LABELS';
 
       try {
         final response = await http.get(Uri.parse(url));
@@ -253,6 +359,8 @@ class GerritService {
                 mergeable: mergeable,
                 updated: existingChange.updated,
                 currentRevision: existingChange.currentRevision,
+                lgtm: existingChange.lgtm,
+                unsent: existingChange.unsent,
               );
             }
           }

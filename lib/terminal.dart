@@ -12,6 +12,8 @@ class Terminal {
   static final AnsiPen _redPen = AnsiPen()..red();
   static final AnsiPen _cyanPen = AnsiPen()..cyan();
   static final AnsiPen _bluePen = AnsiPen()..blue();
+  static final AnsiPen _grayPen = AnsiPen()..gray();
+  static final AnsiPen _defaultPen = AnsiPen();
 
   /// Print text in green color (typically for success/active status).
   static void green(String text) {
@@ -53,6 +55,11 @@ class Terminal {
     print(_bluePen(text));
   }
 
+  /// Print text in gray color (typically for abandoned status).
+  static void gray(String text) {
+    print(_grayPen(text));
+  }
+
   /// Print text in default terminal color (no color applied).
   static void info(String text) {
     print(text);
@@ -88,5 +95,15 @@ class Terminal {
   /// Returns a string colored in blue.
   static String blueText(String text) {
     return _bluePen(text);
+  }
+
+  /// Returns a string colored in gray.
+  static String grayText(String text) {
+    return _grayPen(text);
+  }
+
+  /// Returns a string colored in gray.
+  static String plainText(String text) {
+    return _defaultPen(text);
   }
 }

@@ -47,8 +47,9 @@ class OutputFormatter {
     final branchNameColWidth = max(20, maxBranchNameLength + 1);
 
     // Define column headers and widths based on what should be displayed
-    final headers = <String>['Branch Name', 'Status'];
-    final columnWidths = <int>[branchNameColWidth, 17];
+    final headers = ['Branch Name', 'Status'];
+    var statusLength = branchInfoList.statusLength;
+    final columnWidths = [branchNameColWidth, statusLength];
 
     if (displayOptions.showLocal) {
       headers.addAll(['Local Hash', 'Local Date']);
@@ -161,14 +162,9 @@ class OutputFormatter {
 
     if (arrowSuffix.isNotEmpty) {
       // Replace the last characters of the padded string with arrows
-      final statusLength = status.length;
-      final paddingLength = columnWidths[1] - statusLength - arrowSuffix.length;
-      if (paddingLength >= 0) {
-        statusStr = status + (' ' * paddingLength) + arrowSuffix;
-      } else {
-        // If status is too long, just append arrows
-        statusStr = status + arrowSuffix;
-      }
+      statusStr =
+          statusStr.substring(0, statusStr.length - arrowSuffix.length) +
+          arrowSuffix;
     }
 
     // Track column index as we build the row
@@ -323,14 +319,16 @@ class OutputFormatter {
   /// Gets the color text function for a status.
   String Function(String) _getStatusColorTextFunction(String status) {
     switch (status) {
-      case 'Active':
+      case String(:var startsWith) when startsWith('Active'):
         return Terminal.greenText;
       case 'WIP':
         return Terminal.yellowText;
-      case 'Merge conflict':
+      case String(:var startsWith) when startsWith('Merge '):
         return Terminal.redText;
       case 'Merged':
         return Terminal.cyanText;
+      case 'Abandoned':
+        return Terminal.grayText;
       default:
         return (String text) => text; // No color for default
     }
@@ -458,5 +456,18 @@ class OutputFormatter {
     // Display total time
     final paddedTotal = 'Total execution time'.padRight(maxNameLength);
     Terminal.info('  $paddedTotal: ${totalTime.toString().padLeft(5)}ms');
+  }
+}
+
+extension on List<BranchInfo> {
+  int get statusLength {
+    var maxLength = 0;
+    for (final branch in this) {
+      final length = branch.getDisplayStatus().length;
+      if (length > maxLength) {
+        maxLength = length;
+      }
+    }
+    return maxLength + 3;
   }
 }

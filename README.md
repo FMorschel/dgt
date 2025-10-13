@@ -9,11 +9,12 @@ A command-line interface tool for Dart SDK contributors to manage their local br
 
 - **List Local Branches**: Display all your local Git branches with their Gerrit review status
 - **Gerrit Integration**: Automatically queries Gerrit REST API to get the current status of your changes
-- **Status Detection**: Shows one of four states for each branch:
+- **Status Detection**: Shows one of five states for each branch:
   - **WIP** (Work in Progress): Changes marked as work-in-progress in Gerrit
   - **Active**: Changes that are ready for review (NEW status in Gerrit)
   - **Merge conflict**: Changes that cannot be merged cleanly
   - **Merged**: Changes that have been successfully merged
+  - **Abandoned**: Changes that have been abandoned in Gerrit
 
 ## Prerequisites
 
@@ -59,6 +60,7 @@ Total: 6 branches
 - 🟡 **WIP** (Yellow): Work in progress, not ready for review
 - 🔴 **Merge conflict** (Red): Cannot be merged, needs rebase
 - 🔵 **Merged** (Cyan/Blue): Successfully merged
+- ⚫ **Abandoned** (Gray): Abandoned changes
 - ⚪ **-** (White): No Gerrit change (local-only branch)
 
 **Difference Highlighting:**
@@ -204,6 +206,7 @@ Allowed status values:
 - `wip` - Work in Progress
 - `active` - Ready for review
 - `merged` - Successfully merged
+- `abandoned` - Abandoned changes
 - `conflict` - Has merge conflicts
 
 > **Tip:** Run `dgt --help` to see all available options and status values.

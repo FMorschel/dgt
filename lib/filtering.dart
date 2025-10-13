@@ -48,6 +48,7 @@ const Map<String, String> statusMapping = {
   'wip': 'WIP',
   'active': 'Active',
   'merged': 'Merged',
+  'abandoned': 'Abandoned',
   'conflict': 'Merge conflict',
 };
 
@@ -56,6 +57,7 @@ const Map<String, String> statusDescriptions = {
   'wip': 'Work in Progress',
   'active': 'Ready for review',
   'merged': 'Successfully merged',
+  'abandoned': 'Abandoned changes',
   'conflict': 'Has merge conflicts',
 };
 

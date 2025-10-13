@@ -370,9 +370,10 @@ git log -1 --format=%B <branch>     # Get commit message
 ### Status Priority (when multiple conditions match)
 
 1. Merged (highest priority)
-2. Merge conflict
-3. WIP
-4. Active
+2. Abandoned
+3. Merge conflict
+4. WIP
+5. Active
 
 ---
 

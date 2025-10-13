@@ -45,7 +45,7 @@ This leads to inefficiency and potential oversight of important review status ch
 **Acceptance Criteria**:
 
 - List all local branches
-- Show one of four status indicators: WIP, Active, Merge conflict, Merged
+- Show one of five status indicators: WIP, Active, Merge conflict, Merged, Abandoned
 - Display local commit hash (hash of the commit on the local branch)
 - Display Gerrit commit hash (hash of the latest commit in the Gerrit change)
 - Display local commit date (timestamp of the local commit)
@@ -72,6 +72,7 @@ This leads to inefficiency and potential oversight of important review status ch
 - **Active**: Changes with `status: "NEW"` and `work_in_progress: false`
 - **Merge conflict**: Changes with `mergeable: false`
 - **Merged**: Changes with `status: "MERGED"`
+- **Abandoned**: Changes with `status: "ABANDONED"`
 
 #### 3. Git Configuration Parsing
 
@@ -161,6 +162,7 @@ Performance Summary:
 - **Active**: Green
 - **Merge conflict**: Red
 - **Merged**: Blue/Cyan
+- **Abandoned**: Gray
 
 **Difference Highlighting**:
 

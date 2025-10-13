@@ -160,9 +160,10 @@ DGT maps Gerrit API fields to user-friendly statuses:
 | Gerrit Condition | DGT Status | Priority |
 |-----------------|------------|----------|
 | `status == "MERGED"` | **Merged** | 1 (Highest) |
-| `mergeable == false` | **Merge conflict** | 2 |
-| `work_in_progress == true` | **WIP** | 3 |
-| `status == "NEW"` | **Active** | 4 (Default) |
+| `status == "ABANDONED"` | **Abandoned** | 2 |
+| `mergeable == false` | **Merge conflict** | 3 |
+| `work_in_progress == true` | **WIP** | 4 |
+| `status == "NEW"` | **Active** | 5 (Default) |
 
 **Priority Rules:**
 
