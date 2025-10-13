@@ -50,7 +50,7 @@ refactor/cleanup     | Merged          | g3h4i5j6     | 2025-10-07 09:20  | g3h4
 hotfix/crash         | Merge conflict  | k7l8m9n0     | 2025-10-09 08:00  | k7l8m9n0     | 2025-10-09 08:00
 experiment/perf      | -               | o1p2q3r4     | 2025-10-06 13:15  | -            | -
 
-Total: 6 branch(es)
+Total: 6 branches
 ```
 
 **Color Coding:**

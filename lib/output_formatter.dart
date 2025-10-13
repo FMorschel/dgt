@@ -68,7 +68,8 @@ class OutputFormatter {
 
     // Print summary
     Terminal.info('');
-    Terminal.info('Total: ${branchInfoList.length} branch(es)');
+    final branchText = branchInfoList.length == 1 ? 'branch' : 'branches';
+    Terminal.info('Total: ${branchInfoList.length} $branchText');
   }
 
   /// Prints the table header row.

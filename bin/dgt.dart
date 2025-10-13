@@ -285,7 +285,8 @@ Future<void> runListCommand(
     }
 
     if (verbose) {
-      Terminal.info('[VERBOSE] Found ${branches.length} branch(es)');
+      final branchText = branches.length == 1 ? 'branch' : 'branches';
+      Terminal.info('[VERBOSE] Found ${branches.length} $branchText');
     }
 
     // Collect branch information
