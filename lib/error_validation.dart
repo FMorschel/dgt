@@ -118,7 +118,8 @@ class FlagValidator {
       final description = CliOptions.statusDescriptions[status];
       if (description != null) {
         // Regular status values with descriptions
-        final padding = ' ' * (11 - status.length); // 'abandoned' is longest at 9 chars
+        final padding =
+            ' ' * (11 - status.length); // 'abandoned' is longest at 9 chars
         Terminal.info('  $status$padding- $description');
       } else {
         // Special values like 'gerrit' and 'local'
