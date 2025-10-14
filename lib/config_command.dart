@@ -1,20 +1,35 @@
 import 'config_service.dart';
 import 'terminal.dart';
 
+/// Handles the config show subcommand
+Future<void> runConfigShowCommand(bool verbose) async {
+  await ConfigService.showConfig(verbose: verbose);
+}
+
+/// Handles the config clean subcommand
+Future<void> runConfigCleanCommand(bool verbose, bool force) async {
+  await ConfigService.cleanConfig(verbose: verbose, force: force);
+}
+
 /// Handles the config command to set default configuration options
 Future<void> runConfigCommand(
   bool verbose,
-  bool? showGerrit,
-  bool? showLocal,
-  bool? showUrl,
-  List<String>? filterStatuses,
-  String? filterSince,
-  String? filterBefore,
-  bool? filterDiverged,
-  String? sortField,
-  String? sortDirection,
+  DgtConfig configToSave,
+  bool removeStatus,
+  bool removeDiverged,
 ) async {
   try {
+    // Handle removal flags first
+    if (removeStatus) {
+      await ConfigService.removeOption('status', verbose: verbose);
+      return;
+    }
+
+    if (removeDiverged) {
+      await ConfigService.removeOption('diverged', verbose: verbose);
+      return;
+    }
+
     // Read existing config first
     final existingConfig = await ConfigService.readConfig(verbose: verbose);
 
@@ -22,19 +37,21 @@ Future<void> runConfigCommand(
     // Only update fields that were explicitly provided
     // Empty string signals to clear a field
     final config = DgtConfig(
-      showGerrit: showGerrit ?? existingConfig?.showGerrit,
-      showLocal: showLocal ?? existingConfig?.showLocal,
-      showUrl: showUrl ?? existingConfig?.showUrl,
-      filterStatuses: filterStatuses ?? existingConfig?.filterStatuses,
-      filterSince: filterSince ?? existingConfig?.filterSince,
-      filterBefore: filterBefore ?? existingConfig?.filterBefore,
-      filterDiverged: filterDiverged ?? existingConfig?.filterDiverged,
-      sortField: sortField == ''
+      showGerrit: configToSave.showGerrit ?? existingConfig?.showGerrit,
+      showLocal: configToSave.showLocal ?? existingConfig?.showLocal,
+      showUrl: configToSave.showUrl ?? existingConfig?.showUrl,
+      filterStatuses:
+          configToSave.filterStatuses ?? existingConfig?.filterStatuses,
+      filterSince: configToSave.filterSince ?? existingConfig?.filterSince,
+      filterBefore: configToSave.filterBefore ?? existingConfig?.filterBefore,
+      filterDiverged:
+          configToSave.filterDiverged ?? existingConfig?.filterDiverged,
+      sortField: configToSave.sortField == ''
           ? null
-          : (sortField ?? existingConfig?.sortField),
-      sortDirection: sortDirection == ''
+          : (configToSave.sortField ?? existingConfig?.sortField),
+      sortDirection: configToSave.sortDirection == ''
           ? null
-          : (sortDirection ?? existingConfig?.sortDirection),
+          : (configToSave.sortDirection ?? existingConfig?.sortDirection),
     );
 
     // Write config to file

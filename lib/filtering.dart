@@ -61,11 +61,31 @@ const Map<String, String> statusDescriptions = {
   'conflict': 'Has merge conflicts',
 };
 
+/// All accepted Gerrit status values (for --status all)
+const List<String> allGerritStatuses = [
+  'WIP',
+  'Active',
+  'Merged',
+  'Abandoned',
+  'Merge conflict',
+];
+
+/// Special status value to indicate local-only branches
+const String localStatusValue = 'local';
+
 /// Validates status value against allowed values.
 ///
 /// Throws FormatException if status is invalid.
+/// Allows special values: 'all' and 'local'
 void validateStatus(String status) {
-  if (!statusMapping.containsKey(status.toLowerCase())) {
+  final lowerStatus = status.toLowerCase();
+
+  // Allow special status values
+  if (lowerStatus == 'all' || lowerStatus == 'local') {
+    return;
+  }
+
+  if (!statusMapping.containsKey(lowerStatus)) {
     final allowedValues = statusMapping.keys
         .map((key) {
           return '$key (${statusDescriptions[key]})';
@@ -75,7 +95,9 @@ void validateStatus(String status) {
     throw FormatException(
       'Invalid status: "$status".\n'
       'Allowed values:\n'
-      '    $allowedValues',
+      '    $allowedValues\n'
+      '    all (All Gerrit statuses)\n'
+      '    local (Branches without Gerrit configuration)',
     );
   }
 }
@@ -100,14 +122,53 @@ List<BranchInfo> applyFilters(
 
   // Apply status filter
   if (filters.statuses != null && filters.statuses!.isNotEmpty) {
-    // Map CLI values to display values
-    final displayStatuses = filters.statuses!
+    // Check if 'all' is in the statuses
+    final hasAll = filters.statuses!.any((s) => s.toLowerCase() == 'all');
+
+    // Check if 'local' is in the statuses
+    final hasLocal = filters.statuses!.any((s) => s.toLowerCase() == 'local');
+
+    // Get the regular status filters (excluding 'all' and 'local')
+    final regularStatuses = filters.statuses!
+        .where((s) => s.toLowerCase() != 'all' && s.toLowerCase() != 'local')
         .map((s) => statusMapping[s.toLowerCase()] ?? s)
         .toList();
 
+    // Build the combined status list
+    final displayStatuses = <String>[];
+
+    if (hasAll) {
+      // Add all Gerrit statuses
+      displayStatuses.addAll(allGerritStatuses);
+    }
+
+    // Add regular statuses (if not already included via 'all')
+    for (final status in regularStatuses) {
+      if (!displayStatuses.contains(status)) {
+        displayStatuses.add(status);
+      }
+    }
+
     filtered = filtered.where((branch) {
-      final status = branch.getDisplayStatus();
-      return displayStatuses.contains(status);
+      // Handle 'local' status (branches without Gerrit config)
+      final hasGerritConfig = branch.gerritConfig.hasGerritConfig;
+
+      if (hasLocal && !hasGerritConfig) {
+        return true;
+      }
+
+      // If 'all' is specified, include all branches with Gerrit config
+      if (hasAll && hasGerritConfig) {
+        return true;
+      }
+
+      // Handle regular Gerrit statuses
+      if (displayStatuses.isNotEmpty && hasGerritConfig) {
+        final status = branch.getDisplayStatus();
+        return displayStatuses.contains(status);
+      }
+
+      return false;
     }).toList();
   }
 

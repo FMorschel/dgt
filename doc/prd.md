@@ -333,3 +333,16 @@ The following requirements capture user requests and open issues identified for 
      - The URL should link directly to the Gerrit change page for each branch (when available).
      - The column should be shown alongside branch name and status, and may be toggled on/off for space efficiency.
      - Handle branches without Gerrit changes gracefully (show empty or placeholder).
+
+4. Configuration management and status filtering
+
+   - Description: Users should be able to manage persistent configuration settings and filter branches by status, including local-only branches.
+   - Acceptance criteria:
+     - Provide ability to remove all `status` filters set in config (via command or flag).
+     - Ensure all config options can be removed or overridden locally via CLI flags.
+     - Provide a command to clean/reset the entire config file to defaults.
+     - Provide a command to display the current config file contents.
+     - Support `--status all` as an alias to show all accepted status values (WIP, Active, Merge conflict, Merged, Abandoned).
+     - Support `--status local` option to filter branches that have not been sent to Gerrit (branches without gerritissue configuration).
+     - CLI flags must always take precedence over config file settings.
+     - Config commands should validate inputs and provide clear error messages for invalid operations.

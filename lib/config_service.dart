@@ -56,6 +56,13 @@ class DgtConfig {
       } else if (results.wasParsed('asc')) {
         configSortDirection = 'asc';
       }
+    } else {
+      // Handle standalone --asc or --desc flags without --sort
+      if (results.wasParsed('desc')) {
+        configSortDirection = 'desc';
+      } else if (results.wasParsed('asc')) {
+        configSortDirection = 'asc';
+      }
     }
 
     return DgtConfig(
@@ -156,20 +163,20 @@ extension DgtConfigExtensions on DgtConfig? {
   ///   null,
   /// );
   /// ```
-  String? resolveOption(
+  T resolveOption<T extends String?>(
     ArgResults argResults,
     String optionName,
-    String? defaultValue,
+    T defaultValue,
   ) {
     // Check if option was explicitly provided by the user
     if (argResults.wasParsed(optionName)) {
-      return argResults.option(optionName);
+      return argResults.option(optionName) as T;
     }
 
     // Check config file based on option name
     final configValue = _getConfigOptionValue(optionName);
     if (configValue != null) {
-      return configValue;
+      return configValue as T;
     }
 
     // Return default value
@@ -248,6 +255,41 @@ extension DgtConfigExtensions on DgtConfig? {
       default:
         return null;
     }
+  }
+
+  /// Resolve sort direction with special handling for asc/desc flags.
+  ///
+  /// Precedence:
+  /// 1. --desc flag (if explicitly provided)
+  /// 2. --asc flag (if explicitly provided)
+  /// 3. Config file value (if available)
+  /// 4. Default value
+  ///
+  /// Example:
+  /// ```dart
+  /// final sortDirection = config.resolveSortDirection(
+  ///   argResults,
+  ///   'asc', // default
+  /// );
+  /// ```
+  String resolveSortDirection(ArgResults argResults, String defaultValue) {
+    // Check if desc flag was explicitly provided
+    if (argResults.wasParsed('desc') && argResults.flag('desc')) {
+      return 'desc';
+    }
+
+    // Check if asc flag was explicitly provided
+    if (argResults.wasParsed('asc') && argResults.flag('asc')) {
+      return 'asc';
+    }
+
+    // Check config file value
+    if (this?.sortDirection case var direction?) {
+      return direction;
+    }
+
+    // Return default value
+    return defaultValue;
   }
 }
 
@@ -373,6 +415,197 @@ class ConfigService {
         print('[VERBOSE] Error writing config file: $e');
       }
       rethrow;
+    }
+  }
+
+  /// Display the current configuration to the console
+  static Future<void> showConfig({bool verbose = false}) async {
+    try {
+      final configPath = getConfigFilePath();
+      final configFile = File(configPath);
+
+      if (!await configFile.exists()) {
+        print('No configuration file found at: $configPath');
+        print('');
+        print('To create a configuration file, use:');
+        print('  dgt config --gerrit --local');
+        print('  dgt config --status active');
+        print('  dgt config --sort local-date --desc');
+        return;
+      }
+
+      final contents = await configFile.readAsString();
+      final json = jsonDecode(contents) as Map<String, dynamic>;
+      final config = DgtConfig.fromJson(json);
+
+      print('Configuration file: $configPath');
+      print('');
+
+      if (json.isEmpty) {
+        print('Configuration is empty (using all defaults).');
+        return;
+      }
+
+      print('Current settings:');
+      print('');
+
+      // Display settings
+      if (config.showLocal != null) {
+        print('  local:  ${config.showLocal}');
+      }
+      if (config.showGerrit != null) {
+        print('  gerrit: ${config.showGerrit}');
+      }
+      if (config.showUrl != null) {
+        print('  url:    ${config.showUrl}');
+      }
+      if (config.filterStatuses != null && config.filterStatuses!.isNotEmpty) {
+        print('  filterStatuses: ${config.filterStatuses}');
+      }
+      if (config.filterSince != null) {
+        print('  filterSince:    ${config.filterSince}');
+      }
+      if (config.filterBefore != null) {
+        print('  filterBefore:   ${config.filterBefore}');
+      }
+      if (config.filterDiverged != null) {
+        print('  filterDiverged: ${config.filterDiverged}');
+      }
+      if (config.sortField != null) {
+        print('  sortField:      ${config.sortField}');
+      }
+      if (config.sortDirection != null) {
+        print('  sortDirection:  ${config.sortDirection}');
+      }
+
+      print('');
+      print('These settings are used as defaults.');
+      print('Override with command-line flags when needed.');
+    } catch (e) {
+      if (verbose) {
+        print('[VERBOSE] Error reading config file: $e');
+      }
+      print('Error reading configuration file: $e');
+    }
+  }
+
+  /// Clean (reset) the configuration file to defaults
+  static Future<void> cleanConfig({
+    bool verbose = false,
+    bool force = false,
+  }) async {
+    try {
+      final configPath = getConfigFilePath();
+      final configFile = File(configPath);
+
+      if (!await configFile.exists()) {
+        print('No configuration file found at: $configPath');
+        print('Nothing to clean.');
+        return;
+      }
+
+      // Prompt for confirmation unless force flag is set
+      if (!force) {
+        stdout.write(
+          'This will reset all configuration to defaults. Continue? (y/N): ',
+        );
+        final response = stdin.readLineSync()?.toLowerCase().trim();
+        if (response != 'y' && response != 'yes') {
+          print('Cancelled.');
+          return;
+        }
+      }
+
+      // Delete the config file
+      await configFile.delete();
+
+      if (verbose) {
+        print('[VERBOSE] Deleted config file: $configPath');
+      }
+
+      print('Configuration reset to defaults.');
+      print('Config file deleted: $configPath');
+    } catch (e) {
+      if (verbose) {
+        print('[VERBOSE] Error cleaning config file: $e');
+      }
+      print('Error cleaning configuration: $e');
+    }
+  }
+
+  /// Remove a specific option from the configuration
+  static Future<void> removeOption(
+    String optionName, {
+    bool verbose = false,
+  }) async {
+    try {
+      // Read existing config
+      final existingConfig = await readConfig(verbose: verbose);
+
+      if (existingConfig == null) {
+        print('No configuration file found. Nothing to remove.');
+        return;
+      }
+
+      // Create a new config with the specified option removed
+      DgtConfig newConfig;
+
+      switch (optionName) {
+        case 'status':
+          newConfig = DgtConfig(
+            showLocal: existingConfig.showLocal,
+            showGerrit: existingConfig.showGerrit,
+            showUrl: existingConfig.showUrl,
+            filterStatuses: null, // Remove status filters
+            filterSince: existingConfig.filterSince,
+            filterBefore: existingConfig.filterBefore,
+            filterDiverged: existingConfig.filterDiverged,
+            sortField: existingConfig.sortField,
+            sortDirection: existingConfig.sortDirection,
+          );
+        case 'diverged':
+          newConfig = DgtConfig(
+            showLocal: existingConfig.showLocal,
+            showGerrit: existingConfig.showGerrit,
+            showUrl: existingConfig.showUrl,
+            filterStatuses: existingConfig.filterStatuses,
+            filterSince: existingConfig.filterSince,
+            filterBefore: existingConfig.filterBefore,
+            filterDiverged: null, // Remove diverged filter
+            sortField: existingConfig.sortField,
+            sortDirection: existingConfig.sortDirection,
+          );
+        case 'sort':
+          newConfig = DgtConfig(
+            showLocal: existingConfig.showLocal,
+            showGerrit: existingConfig.showGerrit,
+            showUrl: existingConfig.showUrl,
+            filterStatuses: existingConfig.filterStatuses,
+            filterSince: existingConfig.filterSince,
+            filterBefore: existingConfig.filterBefore,
+            filterDiverged: existingConfig.filterDiverged,
+            sortField: null, // Remove sort options
+            sortDirection: null,
+          );
+        default:
+          print('Unknown option: $optionName');
+          print('Valid options: status, diverged, sort');
+          return;
+      }
+
+      // Write the updated config
+      await writeConfig(newConfig, verbose: verbose);
+
+      print('Removed "$optionName" from configuration.');
+
+      if (verbose) {
+        print('[VERBOSE] Updated config file');
+      }
+    } catch (e) {
+      if (verbose) {
+        print('[VERBOSE] Error removing option: $e');
+      }
+      print('Error removing option: $e');
     }
   }
 }

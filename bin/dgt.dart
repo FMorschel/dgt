@@ -11,6 +11,7 @@ import 'package:dgt/git_service.dart';
 import 'package:dgt/git_service_batch.dart';
 import 'package:dgt/output_formatter.dart';
 import 'package:dgt/performance_tracker.dart';
+import 'package:dgt/print_usage.dart';
 import 'package:dgt/sorting.dart';
 import 'package:dgt/terminal.dart';
 
@@ -59,8 +60,16 @@ ArgParser buildParser() {
       'status',
       help:
           'Filter branches by Gerrit status. '
-          'Allowed: wip, active, merged, abandoned, conflict',
-      allowed: ['wip', 'active', 'merged', 'abandoned', 'conflict'],
+          'Allowed: wip, active, merged, abandoned, conflict, all, local',
+      allowed: [
+        'wip',
+        'active',
+        'merged',
+        'abandoned',
+        'conflict',
+        'all',
+        'local',
+      ],
       valueHelp: 'status',
     )
     ..addOption(
@@ -79,6 +88,25 @@ ArgParser buildParser() {
       help: 'Filter to show only branches with local or remote differences.',
     )
     ..addFlag(
+      'no-status',
+      negatable: false,
+      help:
+          'Ignore status filters (overrides config; cannot use with --status).',
+    )
+    ..addFlag(
+      'no-diverged',
+      negatable: false,
+      help:
+          'Ignore diverged filter (overrides config; cannot use with '
+          '--diverged).',
+    )
+    ..addFlag(
+      'force',
+      abbr: 'f',
+      negatable: false,
+      help: 'Force operation without confirmation (for config clean).',
+    )
+    ..addFlag(
       'url',
       negatable: true,
       defaultsTo: false,
@@ -95,7 +123,7 @@ ArgParser buildParser() {
     ..addFlag(
       'no-sort',
       negatable: false,
-      help: 'Clear sorting configuration (config command only).',
+      help: 'Disable sorting (shows unsorted output; cannot use with --sort).',
     )
     ..addFlag(
       'asc',
@@ -103,142 +131,6 @@ ArgParser buildParser() {
       help: 'Sort in ascending order (default when --sort is used).',
     )
     ..addFlag('desc', negatable: false, help: 'Sort in descending order.');
-}
-
-void printUsage(ArgParser argParser) {
-  Terminal.info('Usage: dgt [command] [options]');
-  Terminal.info('');
-  Terminal.info(
-    'A tool to list local Git branches with their Gerrit review status.',
-  );
-  Terminal.info('');
-  Terminal.info('Commands:');
-  Terminal.info(
-    '  list      List all local branches with Gerrit status (default)',
-  );
-  Terminal.info(
-    '  config    Set default configuration options in ~/.dgt/.config',
-  );
-  Terminal.info('');
-  Terminal.info('Options:');
-  Terminal.info(argParser.usage);
-  Terminal.info('');
-  Terminal.info('Examples:');
-  Terminal.info(
-    '  dgt                                    # List branches in current '
-    'directory',
-  );
-  Terminal.info(
-    '  dgt --verbose                          # List with verbose output',
-  );
-  Terminal.info(
-    '  dgt --path D:\\repo                     # List branches in specific '
-    'repository',
-  );
-  Terminal.info('  dgt -v -p /path/to/repo                # Combined options');
-  Terminal.info(
-    '  dgt --no-gerrit                        # Hide Gerrit hash and date '
-    'columns',
-  );
-  Terminal.info(
-    '  dgt --no-local                         # Hide local hash and date '
-    'columns',
-  );
-  Terminal.info(
-    '  dgt --timing                           # Display performance timing '
-    'summary',
-  );
-  Terminal.info(
-    '  dgt -v -t                              # Verbose output with timing',
-  );
-  Terminal.info('');
-  Terminal.info('Filtering examples:');
-  Terminal.info(
-    '  dgt --status active                    # Show only Active branches',
-  );
-  Terminal.info(
-    '  dgt --status wip --status active       # Show WIP and Active branches',
-  );
-  Terminal.info(
-    '  dgt --since 2025-10-01                 # Show branches with commits '
-    'after this date',
-  );
-  Terminal.info(
-    '  dgt --before 2025-10-10                # Show branches with commits '
-    'before this date',
-  );
-  Terminal.info(
-    '  dgt --diverged                         # Show only diverged branches',
-  );
-  Terminal.info(
-    '  dgt --status active --diverged         # Show Active branches that '
-    'have diverged',
-  );
-  Terminal.info('');
-  Terminal.info('Sorting examples:');
-  Terminal.info(
-    '  dgt --sort local-date --desc           # Sort by local date, newest '
-    'first',
-  );
-  Terminal.info(
-    '  dgt --sort status                      # Sort by status (ascending)',
-  );
-  Terminal.info(
-    '  dgt --sort divergences --desc          # Sort by divergences, most '
-    'diverged first',
-  );
-  Terminal.info(
-    '  dgt --sort name --asc                  # Sort by branch name '
-    'alphabetically',
-  );
-  Terminal.info(
-    '  dgt --status active --sort local-date  # Combine filtering and sorting',
-  );
-  Terminal.info('');
-  Terminal.info('Available sort fields:');
-  Terminal.info('  local-date    - Local commit date');
-  Terminal.info('  gerrit-date   - Gerrit update date');
-  Terminal.info('  status        - Gerrit status');
-  Terminal.info('  divergences   - Divergence state');
-  Terminal.info('  name          - Branch name');
-  Terminal.info('');
-  Terminal.info('Available status values:');
-  Terminal.info('  wip       - Work in Progress');
-  Terminal.info('  active    - Ready for review');
-  Terminal.info('  merged    - Successfully merged');
-  Terminal.info('  abandoned - Abandoned changes');
-  Terminal.info('  conflict  - Has merge conflicts');
-  Terminal.info('');
-  Terminal.info('Config command examples:');
-  Terminal.info(
-    '  dgt config --no-gerrit                 # Set default to hide Gerrit '
-    'columns',
-  );
-  Terminal.info(
-    '  dgt config --no-local                  # Set default to hide local '
-    'columns',
-  );
-  Terminal.info(
-    '  dgt config --gerrit --local            # Set default to show both '
-    'columns',
-  );
-  Terminal.info(
-    '  dgt config --no-gerrit --no-local      # Set default to hide both '
-    'columns',
-  );
-  Terminal.info(
-    '  dgt config --status active --diverged  # Set default filters',
-  );
-  Terminal.info(
-    '  dgt config --sort local-date --desc    # Set default sort options',
-  );
-  Terminal.info(
-    '  dgt config --sort name                 # Set default sort by name',
-  );
-  Terminal.info('');
-  Terminal.info(
-    'Note: The config command requires at least one flag to be set.',
-  );
 }
 
 Future<void> runListCommand(
@@ -597,24 +489,72 @@ Future<void> main(List<String> arguments) async {
       }
     }
 
+    // Validate that conflicting flags are not used together
+    if (results.wasParsed('status') && results.wasParsed('no-status')) {
+      Terminal.error(
+        'Error: Cannot specify both --status and --no-status flags.',
+      );
+      Terminal.info(
+        'Use --status to filter by status, or --no-status to show all '
+        'branches.',
+      );
+      return;
+    }
+
+    if (results.wasParsed('diverged') && results.wasParsed('no-diverged')) {
+      Terminal.error(
+        'Error: Cannot specify both --diverged and --no-diverged flags.',
+      );
+      Terminal.info(
+        'Use --diverged to filter, or --no-diverged to disable the filter.',
+      );
+      return;
+    }
+
+    if (results.wasParsed('sort') && results.wasParsed('no-sort')) {
+      Terminal.error('Error: Cannot specify both --sort and --no-sort flags.');
+      Terminal.info(
+        'Use --sort to sort by a field, or --no-sort to disable sorting.',
+      );
+      return;
+    }
+
     // Use centralized resolution helpers for filters and sort options
-    final statusFilters = config.resolveMultiOption(results, 'status', []);
-    final sinceStr = config.resolveOption(results, 'since', null);
-    final beforeStr = config.resolveOption(results, 'before', null);
-    final divergedFilter = config.resolveFlag(results, 'diverged', false);
+    // Handle --no-status flag to override config
+    List<String> statusFilters;
+    if (results.wasParsed('no-status') && results.flag('no-status')) {
+      // User explicitly wants to ignore status filters
+      statusFilters = [];
+    } else {
+      statusFilters = config.resolveMultiOption(results, 'status', []);
+    }
+
+    final sinceStr = config.resolveOption<String?>(results, 'since', null);
+    final beforeStr = config.resolveOption<String?>(results, 'before', null);
+
+    // Handle --no-diverged flag to override config
+    bool divergedFilter;
+    if (results.wasParsed('no-diverged') && results.flag('no-diverged')) {
+      // User explicitly wants to ignore diverged filter
+      divergedFilter = false;
+    } else {
+      divergedFilter = config.resolveFlag(results, 'diverged', false);
+    }
 
     // Resolve sort options using centralized helpers
-    final sortField = config.resolveOption(results, 'sort', null);
-
-    // Handle sort direction (asc/desc flags)
+    // Handle --no-sort flag to override config
+    String? sortField;
     String? sortDirection;
-    if (results.wasParsed('desc')) {
-      sortDirection = 'desc';
-    } else if (results.wasParsed('asc')) {
-      sortDirection = 'asc';
+
+    if (results.wasParsed('no-sort') && results.flag('no-sort')) {
+      // User explicitly wants to disable sorting
+      sortField = null;
+      sortDirection = null;
     } else {
-      // Use config file value if no CLI flag provided
-      sortDirection = config?.sortDirection;
+      sortField = config.resolveOption(results, 'sort', 'name');
+
+      // Handle sort direction using centralized helper
+      sortDirection = config.resolveSortDirection(results, 'asc');
     }
 
     // Validate status filters (from CLI or config file)
@@ -682,8 +622,22 @@ Future<void> main(List<String> arguments) async {
           sortOptions,
         );
       case 'config':
+        // Check for subcommands
+        final subcommand = results.rest.length > 1 ? results.rest[1] : null;
+
+        if (subcommand == 'show') {
+          await runConfigShowCommand(verbose);
+          return;
+        }
+
+        if (subcommand == 'clean') {
+          final force = results.wasParsed('force') && results.flag('force');
+          await runConfigCleanCommand(verbose, force);
+          return;
+        }
+
         // For the config command, user must explicitly provide at least one
-        // flag
+        // flag or valid subcommand
         final hasDisplayFlags =
             results.wasParsed('gerrit') ||
             results.wasParsed('local') ||
@@ -692,7 +646,9 @@ Future<void> main(List<String> arguments) async {
             results.wasParsed('status') ||
             results.wasParsed('since') ||
             results.wasParsed('before') ||
-            results.wasParsed('diverged');
+            results.wasParsed('diverged') ||
+            results.wasParsed('no-status') ||
+            results.wasParsed('no-diverged');
         final hasSortFlags =
             results.wasParsed('sort') ||
             results.wasParsed('no-sort') ||
@@ -704,15 +660,30 @@ Future<void> main(List<String> arguments) async {
             'Error: You must specify at least one flag for the config command.',
           );
           Terminal.info('');
+          Terminal.info('Subcommands:');
+          Terminal.info('  dgt config show   # Display current configuration');
+          Terminal.info(
+            '  dgt config clean  # Reset configuration to defaults',
+          );
+          Terminal.info('');
           Terminal.info('Display options:');
           Terminal.info('  dgt config --no-gerrit --local');
           Terminal.info('');
           Terminal.info('Filter options:');
-          Terminal.info('  dgt config --status Active --diverged');
+          Terminal.info('  dgt config --status active --diverged');
           Terminal.info('  dgt config --since 2025-10-01');
+          Terminal.info(
+            '  dgt config --no-status        # Remove all status filters',
+          );
+          Terminal.info(
+            '  dgt config --no-diverged      # Remove diverged filter',
+          );
           Terminal.info('');
           Terminal.info('Sort options:');
           Terminal.info('  dgt config --sort local-date --desc');
+          Terminal.info(
+            '  dgt config --no-sort          # Remove sort configuration',
+          );
           Terminal.info('');
           Terminal.info(
             'Use --gerrit/--no-gerrit, --local/--no-local, --url/--no-url, '
@@ -729,20 +700,20 @@ Future<void> main(List<String> arguments) async {
           return;
         }
 
+        // Check for removal flags
+        final removeStatus =
+            results.wasParsed('no-status') && results.flag('no-status');
+        final removeDiverged =
+            results.wasParsed('no-diverged') && results.flag('no-diverged');
+
         // Extract config values from parsed arguments
         final configToSave = DgtConfig.fromArgResults(results);
 
         await runConfigCommand(
           verbose,
-          configToSave.showGerrit,
-          configToSave.showLocal,
-          configToSave.showUrl,
-          configToSave.filterStatuses,
-          configToSave.filterSince,
-          configToSave.filterBefore,
-          configToSave.filterDiverged,
-          configToSave.sortField,
-          configToSave.sortDirection,
+          configToSave,
+          removeStatus,
+          removeDiverged,
         );
       default:
         Terminal.error('Unknown command: $command');
