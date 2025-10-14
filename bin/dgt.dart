@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:dgt/branch_info.dart';
+import 'package:dgt/clean_command.dart';
 import 'package:dgt/cli_options.dart';
 import 'package:dgt/config_command.dart';
 import 'package:dgt/config_service.dart';
@@ -300,15 +301,41 @@ Future<void> runListCommand(
 Future<void> main(List<String> arguments) async {
   final argParser = CliOptions.buildParser();
   try {
+    // Special handling for 'clean' command:
+    // - Parse only arguments before 'clean' (global flags)
+    // - Pass everything after 'clean' directly to git cl archive
+    // We need to find 'clean' as a command, not as a subcommand (e.g., not in
+    // 'config clean')
+
+    // Find where 'clean' appears as a top-level command
+    var cleanIndex = -1;
+    for (var i = 0; i < arguments.length; i++) {
+      if (arguments[i] == 'clean') {
+        // Check if this is a top-level command (not a subcommand)
+        // It's a top-level command if:
+        // - It's the first argument, OR
+        // - All previous arguments start with '-' (are flags)
+        if (i == 0 ||
+            arguments.sublist(0, i).every((arg) => arg.startsWith('-'))) {
+          cleanIndex = i;
+          break;
+        }
+      }
+    }
+
+    final argsToparse = cleanIndex >= 0
+        ? arguments.sublist(0, cleanIndex + 1) // Include 'clean' in parsing
+        : arguments;
+
     // Check if the first argument is a known command
-    final knownCommands = ['list', 'config'];
+    final knownCommands = ['list', 'config', 'clean'];
     final hasCommand =
-        arguments.isNotEmpty && knownCommands.contains(arguments.first);
+        argsToparse.isNotEmpty && knownCommands.contains(argsToparse.first);
 
     // If no command specified, default to 'list' by prepending it
-    final argsToparse = hasCommand ? arguments : ['list', ...arguments];
+    final finalArgs = hasCommand ? argsToparse : ['list', ...argsToparse];
 
-    final results = argParser.parse(argsToparse);
+    final results = argParser.parse(finalArgs);
 
     // Process the parsed arguments.
     if (results.flag('help')) {
@@ -336,6 +363,12 @@ Future<void> main(List<String> arguments) async {
     // Execute the appropriate command
     switch (command) {
       case 'list':
+        // Check if help flag is provided for list command
+        if (subResults.flag('help')) {
+          printListHelp();
+          return;
+        }
+
         // Load config from ~/.dgt/.config
         final config = await ConfigService.readConfig();
 
@@ -367,15 +400,12 @@ Future<void> main(List<String> arguments) async {
           null,
         );
 
-        // Handle --no-diverged flag to override config
-        bool divergedFilter;
-        if (subResults.wasParsed('no-diverged') &&
-            subResults.flag('no-diverged')) {
-          // User explicitly wants to ignore diverged filter
-          divergedFilter = false;
-        } else {
-          divergedFilter = config.resolveFlag(subResults, 'diverged', false);
-        }
+        // Handle --diverged/--no-diverged negatable flag to override config
+        // If user explicitly provided the flag, use that boolean; otherwise
+        // resolve the value from the config with default false.
+        final divergedFilter = subResults.wasParsed('diverged')
+            ? subResults.flag('diverged')
+            : config.resolveFlag(subResults, 'diverged', false);
 
         // Resolve sort options using centralized helpers
         // Handle --no-sort flag to override config
@@ -451,33 +481,112 @@ Future<void> main(List<String> arguments) async {
           sortOptions,
         );
       case 'config':
+        // Check if help flag is provided for config command
+        if (subResults.flag('help')) {
+          printConfigCommandHelp();
+          return;
+        }
+
         // Initialize performance tracker if timing is requested
         PerformanceTracker? configTracker;
         if (timing) {
           configTracker = PerformanceTracker();
         }
 
-        // Check for subcommands
-        final subcommand = subResults.rest.isNotEmpty
-            ? subResults.rest[0]
-            : null;
+        // Check for nested subcommands (config show / config clean)
+        final nested = subResults.command;
+        final nestedName = nested?.name;
 
-        if (subcommand == 'show') {
+        if (nestedName == 'show') {
+          final showResults = nested!;
+          // If user requested help on the sub-subcommand, show config help
+          if (showResults.flag('help')) {
+            printConfigShowHelp();
+            if (timing && configTracker != null) {
+              OutputFormatter.displayPerformanceSummary(configTracker);
+            }
+            return;
+          }
+
           await runConfigShowCommand(tracker: configTracker);
 
-          // Display performance summary if timing was requested
           if (timing && configTracker != null) {
             OutputFormatter.displayPerformanceSummary(configTracker);
           }
           return;
         }
 
-        if (subcommand == 'clean') {
+        if (nestedName == 'clean') {
+          final cleanResults = nested!;
+          // If user requested help on the sub-subcommand, show config help
+          if (cleanResults.flag('help')) {
+            printConfigCleanHelp();
+            if (timing && configTracker != null) {
+              OutputFormatter.displayPerformanceSummary(configTracker);
+            }
+            return;
+          }
+
+          // For config clean, use the nested ArgResults so affirmative-only
+          // flags are respected (we attached affirmative-only options to the
+          // 'clean' subcommand parser).
+          // Note: 'force' flag is on the parent subResults (config), not
+          // cleanResults
           final force =
               subResults.wasParsed('force') && subResults.flag('force');
+
+          // Build list of removals based on what flags were passed
+          final removals = <({RemovableConfigOption option, String? value})>[];
+
+          // Check each possible option
+          if (cleanResults.wasParsed('local') && cleanResults.flag('local')) {
+            removals.add((option: RemovableConfigOption.local, value: null));
+          }
+          if (cleanResults.wasParsed('gerrit') && cleanResults.flag('gerrit')) {
+            removals.add((option: RemovableConfigOption.gerrit, value: null));
+          }
+          if (cleanResults.wasParsed('url') && cleanResults.flag('url')) {
+            removals.add((option: RemovableConfigOption.url, value: null));
+          }
+          if (cleanResults.wasParsed('diverged') &&
+              cleanResults.flag('diverged')) {
+            removals.add((option: RemovableConfigOption.diverged, value: null));
+          }
+          if (cleanResults.wasParsed('sort')) {
+            final sortValue = cleanResults.option('sort');
+            removals.add((
+              option: RemovableConfigOption.sort,
+              value: sortValue,
+            ));
+          }
+          if (cleanResults.wasParsed('status')) {
+            final statusValues = cleanResults.multiOption('status');
+            for (final value in statusValues) {
+              removals.add((
+                option: RemovableConfigOption.status,
+                value: value,
+              ));
+            }
+          }
+          if (cleanResults.wasParsed('since')) {
+            removals.add((option: RemovableConfigOption.since, value: null));
+          }
+          if (cleanResults.wasParsed('before')) {
+            removals.add((option: RemovableConfigOption.before, value: null));
+          }
+
+          // If any specific options were requested, remove them
+          if (removals.isNotEmpty) {
+            await ConfigService.removeOptions(removals);
+            if (timing && configTracker != null) {
+              OutputFormatter.displayPerformanceSummary(configTracker);
+            }
+            return;
+          }
+
+          // Default: perform full config clean (reset to defaults)
           await runConfigCleanCommand(force, tracker: configTracker);
 
-          // Display performance summary if timing was requested
           if (timing && configTracker != null) {
             OutputFormatter.displayPerformanceSummary(configTracker);
           }
@@ -499,9 +608,6 @@ Future<void> main(List<String> arguments) async {
         // Check for removal flags
         final removeStatus =
             subResults.wasParsed('no-status') && subResults.flag('no-status');
-        final removeDiverged =
-            subResults.wasParsed('no-diverged') &&
-            subResults.flag('no-diverged');
         final removeSort =
             subResults.wasParsed('no-sort') && subResults.flag('no-sort');
 
@@ -511,7 +617,6 @@ Future<void> main(List<String> arguments) async {
         await runConfigCommand(
           configToSave,
           removeStatus,
-          removeDiverged,
           removeSort,
           tracker: configTracker,
         );
@@ -519,6 +624,25 @@ Future<void> main(List<String> arguments) async {
         // Display performance summary if timing was requested
         if (timing && configTracker != null) {
           OutputFormatter.displayPerformanceSummary(configTracker);
+        }
+      case 'clean':
+        // Initialize performance tracker if timing is requested
+        PerformanceTracker? cleanTracker;
+        if (timing) {
+          cleanTracker = PerformanceTracker();
+        }
+
+        // Get all arguments after 'clean' from the original arguments list
+        // These will be passed directly to 'git cl archive'
+        final cleanArgs = cleanIndex >= 0
+            ? arguments.sublist(cleanIndex + 1)
+            : <String>[];
+
+        await runCleanCommand(cleanArgs, tracker: cleanTracker);
+
+        // Display performance summary if timing was requested
+        if (timing && cleanTracker != null) {
+          OutputFormatter.displayPerformanceSummary(cleanTracker);
         }
       default:
         Terminal.error('Unknown command: $command');

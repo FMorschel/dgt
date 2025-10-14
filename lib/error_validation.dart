@@ -21,20 +21,6 @@ class FlagValidator {
     return true;
   }
 
-  /// Validates that --diverged and --no-diverged are not both specified.
-  static bool validateDivergedFlags(ArgResults results) {
-    if (results.wasParsed('diverged') && results.wasParsed('no-diverged')) {
-      Terminal.error(
-        'Error: Cannot specify both --diverged and --no-diverged flags.',
-      );
-      Terminal.info(
-        'Use --diverged to filter, or --no-diverged to disable the filter.',
-      );
-      return false;
-    }
-    return true;
-  }
-
   /// Validates that --sort and --no-sort are not both specified.
   static bool validateSortFlags(ArgResults results) {
     if (results.wasParsed('sort') && results.wasParsed('no-sort')) {
@@ -61,7 +47,6 @@ class FlagValidator {
   /// Returns true if all validations pass, false if any fail.
   static bool validateAllFlags(ArgResults results) {
     return validateStatusFlags(results) &&
-        validateDivergedFlags(results) &&
         validateSortFlags(results) &&
         validateSortDirectionFlags(results);
   }

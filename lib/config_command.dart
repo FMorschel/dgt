@@ -1,3 +1,4 @@
+import 'cli_options.dart';
 import 'config_service.dart';
 import 'performance_tracker.dart';
 import 'terminal.dart';
@@ -23,7 +24,6 @@ Future<void> runConfigCleanCommand(
 Future<void> runConfigCommand(
   DgtConfig configToSave,
   bool removeStatus,
-  bool removeDiverged,
   bool removeSort, {
   PerformanceTracker? tracker,
 }) async {
@@ -32,15 +32,9 @@ Future<void> runConfigCommand(
 
     // Handle removal flags first
     if (removeStatus) {
-      await ConfigService.removeOption('status');
-      // Show updated config after removal
-      await _displayCurrentConfig();
-      tracker?.endTimer('config_update');
-      return;
-    }
-
-    if (removeDiverged) {
-      await ConfigService.removeOption('diverged');
+      await ConfigService.removeOptions([
+        (option: RemovableConfigOption.status, value: null),
+      ]);
       // Show updated config after removal
       await _displayCurrentConfig();
       tracker?.endTimer('config_update');
@@ -48,7 +42,9 @@ Future<void> runConfigCommand(
     }
 
     if (removeSort) {
-      await ConfigService.removeOption('sort');
+      await ConfigService.removeOptions([
+        (option: RemovableConfigOption.sort, value: null),
+      ]);
       // Show updated config after removal
       await _displayCurrentConfig();
       tracker?.endTimer('config_update');
