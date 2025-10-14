@@ -3,6 +3,8 @@ import 'dart:io';
 
 import 'package:args/args.dart';
 
+import 'verbose_output.dart';
+
 /// Configuration options for the dgt tool
 class DgtConfig {
   DgtConfig({
@@ -51,6 +53,13 @@ class DgtConfig {
     } else if (results.wasParsed('sort')) {
       configSortField = results.option('sort');
       // Only set direction if sort field is also set
+      if (results.wasParsed('desc')) {
+        configSortDirection = 'desc';
+      } else if (results.wasParsed('asc')) {
+        configSortDirection = 'asc';
+      }
+    } else {
+      // Handle standalone --asc or --desc flags without --sort
       if (results.wasParsed('desc')) {
         configSortDirection = 'desc';
       } else if (results.wasParsed('asc')) {
@@ -156,20 +165,20 @@ extension DgtConfigExtensions on DgtConfig? {
   ///   null,
   /// );
   /// ```
-  String? resolveOption(
+  T resolveOption<T extends String?>(
     ArgResults argResults,
     String optionName,
-    String? defaultValue,
+    T defaultValue,
   ) {
     // Check if option was explicitly provided by the user
     if (argResults.wasParsed(optionName)) {
-      return argResults.option(optionName);
+      return argResults.option(optionName) as T;
     }
 
     // Check config file based on option name
     final configValue = _getConfigOptionValue(optionName);
     if (configValue != null) {
-      return configValue;
+      return configValue as T;
     }
 
     // Return default value
@@ -249,6 +258,41 @@ extension DgtConfigExtensions on DgtConfig? {
         return null;
     }
   }
+
+  /// Resolve sort direction with special handling for asc/desc flags.
+  ///
+  /// Precedence:
+  /// 1. --desc flag (if explicitly provided)
+  /// 2. --asc flag (if explicitly provided)
+  /// 3. Config file value (if available)
+  /// 4. Default value
+  ///
+  /// Example:
+  /// ```dart
+  /// final sortDirection = config.resolveSortDirection(
+  ///   argResults,
+  ///   'asc', // default
+  /// );
+  /// ```
+  String resolveSortDirection(ArgResults argResults, String defaultValue) {
+    // Check if desc flag was explicitly provided
+    if (argResults.wasParsed('desc') && argResults.flag('desc')) {
+      return 'desc';
+    }
+
+    // Check if asc flag was explicitly provided
+    if (argResults.wasParsed('asc') && argResults.flag('asc')) {
+      return 'asc';
+    }
+
+    // Check config file value
+    if (this?.sortDirection case var direction?) {
+      return direction;
+    }
+
+    // Return default value
+    return defaultValue;
+  }
 }
 
 /// Service for reading and managing the dgt configuration file
@@ -264,15 +308,15 @@ class ConfigService {
 
   /// Read the configuration from ~/.dgt/.config
   /// Returns null if the file doesn't exist or can't be parsed
-  static Future<DgtConfig?> readConfig({bool verbose = false}) async {
+  static Future<DgtConfig?> readConfig() async {
     try {
       final configPath = getConfigFilePath();
       final configFile = File(configPath);
 
       if (!await configFile.exists()) {
-        if (verbose) {
-          print('[VERBOSE] Config file not found at: $configPath');
-        }
+        VerboseOutput.instance.info(
+          '[VERBOSE] Config file not found at: $configPath',
+        );
         return null;
       }
 
@@ -280,52 +324,56 @@ class ConfigService {
       final json = jsonDecode(contents) as Map<String, dynamic>;
       final config = DgtConfig.fromJson(json);
 
-      if (verbose) {
-        print('[VERBOSE] Loaded config from: $configPath');
-        if (config.showLocal != null) {
-          print('[VERBOSE]   local: ${config.showLocal}');
-        }
-        if (config.showGerrit != null) {
-          print('[VERBOSE]   gerrit: ${config.showGerrit}');
-        }
-        if (config.showUrl != null) {
-          print('[VERBOSE]   url: ${config.showUrl}');
-        }
-        if (config.filterStatuses != null &&
-            config.filterStatuses!.isNotEmpty) {
-          print('[VERBOSE]   filterStatuses: ${config.filterStatuses}');
-        }
-        if (config.filterSince != null) {
-          print('[VERBOSE]   filterSince: ${config.filterSince}');
-        }
-        if (config.filterBefore != null) {
-          print('[VERBOSE]   filterBefore: ${config.filterBefore}');
-        }
-        if (config.filterDiverged != null) {
-          print('[VERBOSE]   filterDiverged: ${config.filterDiverged}');
-        }
-        if (config.sortField != null) {
-          print('[VERBOSE]   sortField: ${config.sortField}');
-        }
-        if (config.sortDirection != null) {
-          print('[VERBOSE]   sortDirection: ${config.sortDirection}');
-        }
+      VerboseOutput.instance.info('[VERBOSE] Loaded config from: $configPath');
+      if (config.showLocal != null) {
+        VerboseOutput.instance.info('[VERBOSE]   local: ${config.showLocal}');
+      }
+      if (config.showGerrit != null) {
+        VerboseOutput.instance.info('[VERBOSE]   gerrit: ${config.showGerrit}');
+      }
+      if (config.showUrl != null) {
+        VerboseOutput.instance.info('[VERBOSE]   url: ${config.showUrl}');
+      }
+      if (config.filterStatuses != null && config.filterStatuses!.isNotEmpty) {
+        VerboseOutput.instance.info(
+          '[VERBOSE]   filterStatuses: ${config.filterStatuses}',
+        );
+      }
+      if (config.filterSince != null) {
+        VerboseOutput.instance.info(
+          '[VERBOSE]   filterSince: ${config.filterSince}',
+        );
+      }
+      if (config.filterBefore != null) {
+        VerboseOutput.instance.info(
+          '[VERBOSE]   filterBefore: ${config.filterBefore}',
+        );
+      }
+      if (config.filterDiverged != null) {
+        VerboseOutput.instance.info(
+          '[VERBOSE]   filterDiverged: ${config.filterDiverged}',
+        );
+      }
+      if (config.sortField != null) {
+        VerboseOutput.instance.info(
+          '[VERBOSE]   sortField: ${config.sortField}',
+        );
+      }
+      if (config.sortDirection != null) {
+        VerboseOutput.instance.info(
+          '[VERBOSE]   sortDirection: ${config.sortDirection}',
+        );
       }
 
       return config;
     } catch (e) {
-      if (verbose) {
-        print('[VERBOSE] Error reading config file: $e');
-      }
+      VerboseOutput.instance.info('[VERBOSE] Error reading config file: $e');
       return null;
     }
   }
 
   /// Write configuration to ~/.dgt/.config
-  static Future<void> writeConfig(
-    DgtConfig config, {
-    bool verbose = false,
-  }) async {
+  static Future<void> writeConfig(DgtConfig config) async {
     try {
       final configPath = getConfigFilePath();
       final configFile = File(configPath);
@@ -342,20 +390,20 @@ class ConfigService {
               '+H',
               configDir.path,
             ], runInShell: true);
-            if (verbose) {
-              if (result.exitCode == 0) {
-                print('[VERBOSE] Set .dgt folder as hidden on Windows');
-              } else {
-                print(
-                  '[VERBOSE] Failed to set .dgt folder as hidden: '
-                  '${result.stderr}',
-                );
-              }
+            if (result.exitCode == 0) {
+              VerboseOutput.instance.info(
+                '[VERBOSE] Set .dgt folder as hidden on Windows',
+              );
+            } else {
+              VerboseOutput.instance.info(
+                '[VERBOSE] Failed to set .dgt folder as hidden: '
+                '${result.stderr}',
+              );
             }
           } catch (e) {
-            if (verbose) {
-              print('[VERBOSE] Could not set hidden attribute: $e');
-            }
+            VerboseOutput.instance.info(
+              '[VERBOSE] Could not set hidden attribute: $e',
+            );
             // Non-critical error, continue anyway
           }
         }
@@ -365,14 +413,185 @@ class ConfigService {
       final json = jsonEncode(config.toJson());
       await configFile.writeAsString(json);
 
-      if (verbose) {
-        print('[VERBOSE] Wrote config to: $configPath');
-      }
+      VerboseOutput.instance.info('[VERBOSE] Wrote config to: $configPath');
     } catch (e) {
-      if (verbose) {
-        print('[VERBOSE] Error writing config file: $e');
-      }
+      VerboseOutput.instance.info('[VERBOSE] Error writing config file: $e');
       rethrow;
+    }
+  }
+
+  /// Display the current configuration to the console
+  static Future<void> showConfig() async {
+    try {
+      final configPath = getConfigFilePath();
+      final configFile = File(configPath);
+
+      if (!await configFile.exists()) {
+        print('No configuration file found at: $configPath');
+        print('');
+        print('To create a configuration file, use:');
+        print('  dgt config --gerrit --local');
+        print('  dgt config --status active');
+        print('  dgt config --sort local-date --desc');
+        return;
+      }
+
+      final contents = await configFile.readAsString();
+      final json = jsonDecode(contents) as Map<String, dynamic>;
+      final config = DgtConfig.fromJson(json);
+
+      print('Configuration file: $configPath');
+      print('');
+
+      if (json.isEmpty) {
+        print('Configuration is empty (using all defaults).');
+        return;
+      }
+
+      print('Current settings:');
+      print('');
+
+      // Display settings
+      if (config.showLocal != null) {
+        print('  local:  ${config.showLocal}');
+      }
+      if (config.showGerrit != null) {
+        print('  gerrit: ${config.showGerrit}');
+      }
+      if (config.showUrl != null) {
+        print('  url:    ${config.showUrl}');
+      }
+      if (config.filterStatuses != null && config.filterStatuses!.isNotEmpty) {
+        print('  filterStatuses: ${config.filterStatuses}');
+      }
+      if (config.filterSince != null) {
+        print('  filterSince:    ${config.filterSince}');
+      }
+      if (config.filterBefore != null) {
+        print('  filterBefore:   ${config.filterBefore}');
+      }
+      if (config.filterDiverged != null) {
+        print('  filterDiverged: ${config.filterDiverged}');
+      }
+      if (config.sortField != null) {
+        print('  sortField:      ${config.sortField}');
+      }
+      if (config.sortDirection != null) {
+        print('  sortDirection:  ${config.sortDirection}');
+      }
+
+      print('');
+      print('These settings are used as defaults.');
+      print('Override with command-line flags when needed.');
+    } catch (e) {
+      VerboseOutput.instance.info('[VERBOSE] Error reading config file: $e');
+      print('Error reading configuration file: $e');
+    }
+  }
+
+  /// Clean (reset) the configuration file to defaults
+  static Future<void> cleanConfig({bool force = false}) async {
+    try {
+      final configPath = getConfigFilePath();
+      final configFile = File(configPath);
+
+      if (!await configFile.exists()) {
+        print('No configuration file found at: $configPath');
+        print('Nothing to clean.');
+        return;
+      }
+
+      // Prompt for confirmation unless force flag is set
+      if (!force) {
+        stdout.write(
+          'This will reset all configuration to defaults. Continue? (y/N): ',
+        );
+        final response = stdin.readLineSync()?.toLowerCase().trim();
+        if (response != 'y' && response != 'yes') {
+          print('Cancelled.');
+          return;
+        }
+      }
+
+      // Delete the config file
+      await configFile.delete();
+
+      VerboseOutput.instance.info('[VERBOSE] Deleted config file: $configPath');
+
+      print('Configuration reset to defaults.');
+      print('Config file deleted: $configPath');
+    } catch (e) {
+      VerboseOutput.instance.info('[VERBOSE] Error cleaning config file: $e');
+      print('Error cleaning configuration: $e');
+    }
+  }
+
+  /// Remove a specific option from the configuration
+  static Future<void> removeOption(String optionName) async {
+    try {
+      // Read existing config
+      final existingConfig = await readConfig();
+
+      if (existingConfig == null) {
+        print('No configuration file found. Nothing to remove.');
+        return;
+      }
+
+      // Create a new config with the specified option removed
+      DgtConfig newConfig;
+
+      switch (optionName) {
+        case 'status':
+          newConfig = DgtConfig(
+            showLocal: existingConfig.showLocal,
+            showGerrit: existingConfig.showGerrit,
+            showUrl: existingConfig.showUrl,
+            filterStatuses: null, // Remove status filters
+            filterSince: existingConfig.filterSince,
+            filterBefore: existingConfig.filterBefore,
+            filterDiverged: existingConfig.filterDiverged,
+            sortField: existingConfig.sortField,
+            sortDirection: existingConfig.sortDirection,
+          );
+        case 'diverged':
+          newConfig = DgtConfig(
+            showLocal: existingConfig.showLocal,
+            showGerrit: existingConfig.showGerrit,
+            showUrl: existingConfig.showUrl,
+            filterStatuses: existingConfig.filterStatuses,
+            filterSince: existingConfig.filterSince,
+            filterBefore: existingConfig.filterBefore,
+            filterDiverged: null, // Remove diverged filter
+            sortField: existingConfig.sortField,
+            sortDirection: existingConfig.sortDirection,
+          );
+        case 'sort':
+          newConfig = DgtConfig(
+            showLocal: existingConfig.showLocal,
+            showGerrit: existingConfig.showGerrit,
+            showUrl: existingConfig.showUrl,
+            filterStatuses: existingConfig.filterStatuses,
+            filterSince: existingConfig.filterSince,
+            filterBefore: existingConfig.filterBefore,
+            filterDiverged: existingConfig.filterDiverged,
+            sortField: null, // Remove sort options
+            sortDirection: null,
+          );
+        default:
+          print('Unknown option: $optionName');
+          print('Valid options: status, diverged, sort');
+          return;
+      }
+
+      // Write the updated config
+      await writeConfig(newConfig);
+
+      print('Removed "$optionName" from configuration.');
+
+      VerboseOutput.instance.info('[VERBOSE] Updated config file');
+    } catch (e) {
+      VerboseOutput.instance.info('[VERBOSE] Error removing option: $e');
+      print('Error removing option: $e');
     }
   }
 }

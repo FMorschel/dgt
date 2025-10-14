@@ -1,248 +1,26 @@
 import 'dart:io';
 
-import 'package:args/args.dart';
 import 'package:dgt/branch_info.dart';
+import 'package:dgt/cli_options.dart';
 import 'package:dgt/config_command.dart';
 import 'package:dgt/config_service.dart';
 import 'package:dgt/display_options.dart';
+import 'package:dgt/error_validation.dart';
 import 'package:dgt/filtering.dart';
 import 'package:dgt/gerrit_service.dart';
 import 'package:dgt/git_service.dart';
 import 'package:dgt/git_service_batch.dart';
 import 'package:dgt/output_formatter.dart';
 import 'package:dgt/performance_tracker.dart';
+import 'package:dgt/print_config.dart';
+import 'package:dgt/print_usage.dart';
 import 'package:dgt/sorting.dart';
 import 'package:dgt/terminal.dart';
+import 'package:dgt/verbose_output.dart';
 
 const String version = '0.0.1';
 
-ArgParser buildParser() {
-  return ArgParser()
-    ..addFlag(
-      'help',
-      abbr: 'h',
-      negatable: false,
-      help: 'Print this usage information.',
-    )
-    ..addFlag(
-      'verbose',
-      abbr: 'v',
-      negatable: false,
-      help: 'Show additional command output.',
-    )
-    ..addFlag('version', negatable: false, help: 'Print the tool version.')
-    ..addFlag(
-      'timing',
-      abbr: 't',
-      negatable: false,
-      help: 'Display performance timing summary.',
-    )
-    ..addOption(
-      'path',
-      abbr: 'p',
-      help: 'Path to the Git repository to analyze.',
-      valueHelp: 'path',
-    )
-    ..addFlag(
-      'gerrit',
-      defaultsTo: true,
-      negatable: true,
-      help: 'Display Gerrit hash and date columns.',
-    )
-    ..addFlag(
-      'local',
-      defaultsTo: true,
-      negatable: true,
-      help: 'Display local hash and date columns.',
-    )
-    ..addMultiOption(
-      'status',
-      help:
-          'Filter branches by Gerrit status. '
-          'Allowed: wip, active, merged, abandoned, conflict',
-      allowed: ['wip', 'active', 'merged', 'abandoned', 'conflict'],
-      valueHelp: 'status',
-    )
-    ..addOption(
-      'since',
-      help: 'Filter branches with commits after this date (ISO 8601 format).',
-      valueHelp: 'date',
-    )
-    ..addOption(
-      'before',
-      help: 'Filter branches with commits before this date (ISO 8601 format).',
-      valueHelp: 'date',
-    )
-    ..addFlag(
-      'diverged',
-      negatable: true,
-      help: 'Filter to show only branches with local or remote differences.',
-    )
-    ..addFlag(
-      'url',
-      negatable: true,
-      defaultsTo: false,
-      help: 'Show Gerrit URL column in the output.',
-    )
-    ..addOption(
-      'sort',
-      help:
-          'Sort branches by field. '
-          'Allowed: local-date, gerrit-date, status, divergences, name',
-      allowed: ['local-date', 'gerrit-date', 'status', 'divergences', 'name'],
-      valueHelp: 'field',
-    )
-    ..addFlag(
-      'no-sort',
-      negatable: false,
-      help: 'Clear sorting configuration (config command only).',
-    )
-    ..addFlag(
-      'asc',
-      negatable: false,
-      help: 'Sort in ascending order (default when --sort is used).',
-    )
-    ..addFlag('desc', negatable: false, help: 'Sort in descending order.');
-}
-
-void printUsage(ArgParser argParser) {
-  Terminal.info('Usage: dgt [command] [options]');
-  Terminal.info('');
-  Terminal.info(
-    'A tool to list local Git branches with their Gerrit review status.',
-  );
-  Terminal.info('');
-  Terminal.info('Commands:');
-  Terminal.info(
-    '  list      List all local branches with Gerrit status (default)',
-  );
-  Terminal.info(
-    '  config    Set default configuration options in ~/.dgt/.config',
-  );
-  Terminal.info('');
-  Terminal.info('Options:');
-  Terminal.info(argParser.usage);
-  Terminal.info('');
-  Terminal.info('Examples:');
-  Terminal.info(
-    '  dgt                                    # List branches in current '
-    'directory',
-  );
-  Terminal.info(
-    '  dgt --verbose                          # List with verbose output',
-  );
-  Terminal.info(
-    '  dgt --path D:\\repo                     # List branches in specific '
-    'repository',
-  );
-  Terminal.info('  dgt -v -p /path/to/repo                # Combined options');
-  Terminal.info(
-    '  dgt --no-gerrit                        # Hide Gerrit hash and date '
-    'columns',
-  );
-  Terminal.info(
-    '  dgt --no-local                         # Hide local hash and date '
-    'columns',
-  );
-  Terminal.info(
-    '  dgt --timing                           # Display performance timing '
-    'summary',
-  );
-  Terminal.info(
-    '  dgt -v -t                              # Verbose output with timing',
-  );
-  Terminal.info('');
-  Terminal.info('Filtering examples:');
-  Terminal.info(
-    '  dgt --status active                    # Show only Active branches',
-  );
-  Terminal.info(
-    '  dgt --status wip --status active       # Show WIP and Active branches',
-  );
-  Terminal.info(
-    '  dgt --since 2025-10-01                 # Show branches with commits '
-    'after this date',
-  );
-  Terminal.info(
-    '  dgt --before 2025-10-10                # Show branches with commits '
-    'before this date',
-  );
-  Terminal.info(
-    '  dgt --diverged                         # Show only diverged branches',
-  );
-  Terminal.info(
-    '  dgt --status active --diverged         # Show Active branches that '
-    'have diverged',
-  );
-  Terminal.info('');
-  Terminal.info('Sorting examples:');
-  Terminal.info(
-    '  dgt --sort local-date --desc           # Sort by local date, newest '
-    'first',
-  );
-  Terminal.info(
-    '  dgt --sort status                      # Sort by status (ascending)',
-  );
-  Terminal.info(
-    '  dgt --sort divergences --desc          # Sort by divergences, most '
-    'diverged first',
-  );
-  Terminal.info(
-    '  dgt --sort name --asc                  # Sort by branch name '
-    'alphabetically',
-  );
-  Terminal.info(
-    '  dgt --status active --sort local-date  # Combine filtering and sorting',
-  );
-  Terminal.info('');
-  Terminal.info('Available sort fields:');
-  Terminal.info('  local-date    - Local commit date');
-  Terminal.info('  gerrit-date   - Gerrit update date');
-  Terminal.info('  status        - Gerrit status');
-  Terminal.info('  divergences   - Divergence state');
-  Terminal.info('  name          - Branch name');
-  Terminal.info('');
-  Terminal.info('Available status values:');
-  Terminal.info('  wip       - Work in Progress');
-  Terminal.info('  active    - Ready for review');
-  Terminal.info('  merged    - Successfully merged');
-  Terminal.info('  abandoned - Abandoned changes');
-  Terminal.info('  conflict  - Has merge conflicts');
-  Terminal.info('');
-  Terminal.info('Config command examples:');
-  Terminal.info(
-    '  dgt config --no-gerrit                 # Set default to hide Gerrit '
-    'columns',
-  );
-  Terminal.info(
-    '  dgt config --no-local                  # Set default to hide local '
-    'columns',
-  );
-  Terminal.info(
-    '  dgt config --gerrit --local            # Set default to show both '
-    'columns',
-  );
-  Terminal.info(
-    '  dgt config --no-gerrit --no-local      # Set default to hide both '
-    'columns',
-  );
-  Terminal.info(
-    '  dgt config --status active --diverged  # Set default filters',
-  );
-  Terminal.info(
-    '  dgt config --sort local-date --desc    # Set default sort options',
-  );
-  Terminal.info(
-    '  dgt config --sort name                 # Set default sort by name',
-  );
-  Terminal.info('');
-  Terminal.info(
-    'Note: The config command requires at least one flag to be set.',
-  );
-}
-
 Future<void> runListCommand(
-  bool verbose,
   String? repositoryPath,
   DisplayOptions displayOptions,
   FilterOptions filters,
@@ -257,9 +35,9 @@ Future<void> runListCommand(
   try {
     // Change to the specified repository path if provided
     if (repositoryPath != null) {
-      if (verbose) {
-        Terminal.info('[VERBOSE] Changing directory to: $repositoryPath');
-      }
+      VerboseOutput.instance.info(
+        '[VERBOSE] Changing directory to: $repositoryPath',
+      );
       try {
         Directory.current = repositoryPath;
       } catch (e) {
@@ -276,9 +54,7 @@ Future<void> runListCommand(
       return;
     }
 
-    if (verbose) {
-      Terminal.info('[VERBOSE] Fetching local branches...');
-    }
+    VerboseOutput.instance.info('[VERBOSE] Fetching local branches...');
 
     // Get all local branches
     tracker?.startTimer('branch_discovery');
@@ -290,10 +66,10 @@ Future<void> runListCommand(
       return;
     }
 
-    if (verbose) {
-      final branchText = branches.length == 1 ? 'branch' : 'branches';
-      Terminal.info('[VERBOSE] Found ${branches.length} $branchText');
-    }
+    final branchText = branches.length == 1 ? 'branch' : 'branches';
+    VerboseOutput.instance.info(
+      '[VERBOSE] Found ${branches.length} $branchText',
+    );
 
     // Collect branch information
     var branchInfoList = <BranchInfo>[];
@@ -301,11 +77,9 @@ Future<void> runListCommand(
     // Batch fetch all Git information at once to minimize git process spawns
     // This uses git for-each-ref and git config --get-regexp to get data for
     // all branches in just 2 git commands instead of 2*N commands.
-    if (verbose) {
-      Terminal.info(
-        '[VERBOSE] Batch fetching Git information for all branches...',
-      );
-    }
+    VerboseOutput.instance.info(
+      '[VERBOSE] Batch fetching Git information for all branches...',
+    );
 
     tracker?.startTimer('git_operations');
 
@@ -336,9 +110,7 @@ Future<void> runListCommand(
       final gerritConfig = gerritConfigMap[branch] ?? GerritBranchConfig();
 
       if (commitInfo != null) {
-        if (verbose) {
-          Terminal.info('[VERBOSE] Processing branch: $branch');
-        }
+        VerboseOutput.instance.info('[VERBOSE] Processing branch: $branch');
 
         branchDataList.add((
           branch: branch,
@@ -348,11 +120,9 @@ Future<void> runListCommand(
           error: null,
         ));
       } else {
-        if (verbose) {
-          Terminal.warning(
-            '[VERBOSE] Failed to get commit info for branch $branch',
-          );
-        }
+        VerboseOutput.instance.warning(
+          '[VERBOSE] Failed to get commit info for branch $branch',
+        );
         branchDataList.add((
           branch: branch,
           localHash: '',
@@ -376,24 +146,22 @@ Future<void> runListCommand(
       // Collect issue numbers for batch query
       if (branchData.gerritConfig.hasGerritConfig &&
           branchData.gerritConfig.gerritIssue != null) {
-        if (verbose) {
-          Terminal.info('[VERBOSE] Branch ${branchData.branch}:');
-          Terminal.info(
-            '[VERBOSE]   Gerrit Issue: ${branchData.gerritConfig.gerritIssue}',
-          );
-          Terminal.info(
-            '[VERBOSE]   Gerrit Server: '
-            '${branchData.gerritConfig.gerritServer}',
-          );
-        }
+        VerboseOutput.instance.info('[VERBOSE] Branch ${branchData.branch}:');
+        VerboseOutput.instance.info(
+          '[VERBOSE]   Gerrit Issue: ${branchData.gerritConfig.gerritIssue}',
+        );
+        VerboseOutput.instance.info(
+          '[VERBOSE]   Gerrit Server: '
+          '${branchData.gerritConfig.gerritServer}',
+        );
 
         final issue = branchData.gerritConfig.gerritIssue!;
         issueNumbersToBranches
             .putIfAbsent(issue, () => <String>[])
             .add(branchData.branch);
-      } else if (verbose) {
-        Terminal.info('[VERBOSE] Branch ${branchData.branch}:');
-        Terminal.info(
+      } else {
+        VerboseOutput.instance.info('[VERBOSE] Branch ${branchData.branch}:');
+        VerboseOutput.instance.info(
           '[VERBOSE]   No Gerrit configuration found for this branch',
         );
       }
@@ -406,12 +174,10 @@ Future<void> runListCommand(
     // This reduces API round-trips and total execution time significantly.
     var gerritChanges = <String, GerritChange?>{};
     if (issueNumbersToBranches.isNotEmpty) {
-      if (verbose) {
-        Terminal.info(
-          '[VERBOSE] Batch querying Gerrit for '
-          '${issueNumbersToBranches.length} issue(s)...',
-        );
-      }
+      VerboseOutput.instance.info(
+        '[VERBOSE] Batch querying Gerrit for '
+        '${issueNumbersToBranches.length} issue(s)...',
+      );
 
       try {
         tracker?.startTimer('gerrit_queries');
@@ -421,20 +187,18 @@ Future<void> runListCommand(
         );
         tracker?.endTimer('gerrit_queries');
 
-        if (verbose) {
-          final foundCount = gerritChanges.values
-              .where((GerritChange? c) => c != null)
-              .length;
-          Terminal.info(
-            '[VERBOSE] Batch query completed: $foundCount/'
-            '${issueNumbers.length} changes found',
-          );
-        }
+        final foundCount = gerritChanges.values
+            .where((GerritChange? c) => c != null)
+            .length;
+        VerboseOutput.instance.info(
+          '[VERBOSE] Batch query completed: $foundCount/'
+          '${issueNumbers.length} changes found',
+        );
       } catch (e) {
         tracker?.endTimer('gerrit_queries');
-        if (verbose) {
-          Terminal.warning('[VERBOSE] Batch Gerrit query failed: $e');
-        }
+        VerboseOutput.instance.warning(
+          '[VERBOSE] Batch Gerrit query failed: $e',
+        );
         // Continue with empty results (partial success)
       }
     }
@@ -453,8 +217,8 @@ Future<void> runListCommand(
           branchData.gerritConfig.gerritIssue != null) {
         gerritChange = gerritChanges[branchData.gerritConfig.gerritIssue!];
 
-        if (verbose && gerritChange != null) {
-          Terminal.info(
+        if (gerritChange != null) {
+          VerboseOutput.instance.info(
             '[VERBOSE] Branch ${branchData.branch}: Gerrit status = '
             '${gerritChange.getUserFriendlyStatus()}',
           );
@@ -487,33 +251,27 @@ Future<void> runListCommand(
 
     // Apply filters
     if (!filters.isEmpty) {
-      if (verbose) {
-        Terminal.info('[VERBOSE] Applying filters...');
-        Terminal.info(
-          '[VERBOSE] Branches before filtering: ${branchInfoList.length}',
-        );
-      }
+      VerboseOutput.instance.info('[VERBOSE] Applying filters...');
+      VerboseOutput.instance.info(
+        '[VERBOSE] Branches before filtering: ${branchInfoList.length}',
+      );
 
       tracker?.startTimer('filtering');
       branchInfoList = applyFilters(branchInfoList, filters);
       tracker?.endTimer('filtering');
 
-      if (verbose) {
-        Terminal.info(
-          '[VERBOSE] Branches after filtering: ${branchInfoList.length}',
-        );
-      }
+      VerboseOutput.instance.info(
+        '[VERBOSE] Branches after filtering: ${branchInfoList.length}',
+      );
     }
 
     // Apply sorting
     if (!sortOptions.isEmpty) {
-      if (verbose) {
-        Terminal.info('[VERBOSE] Applying sorting...');
-        Terminal.info(
-          '[VERBOSE] Sort field: ${sortOptions.field}, '
-          'direction: ${sortOptions.direction ?? "asc"}',
-        );
-      }
+      VerboseOutput.instance.info('[VERBOSE] Applying sorting...');
+      VerboseOutput.instance.info(
+        '[VERBOSE] Sort field: ${sortOptions.field}, '
+        'direction: ${sortOptions.direction ?? "asc"}',
+      );
 
       tracker?.startTimer('sorting');
       branchInfoList = applySort(branchInfoList, sortOptions);
@@ -525,7 +283,6 @@ Future<void> runListCommand(
     final formatter = OutputFormatter(displayOptions);
     formatter.displayBranchTable(
       branchInfoList,
-      verbose: verbose,
       sortField: sortOptions.field,
       sortDirection: sortOptions.direction,
     );
@@ -536,16 +293,22 @@ Future<void> runListCommand(
     }
   } catch (e) {
     Terminal.error('Error: $e');
-    if (verbose) {
-      Terminal.error('Stack trace: ${StackTrace.current}');
-    }
+    Terminal.error('Stack trace: ${StackTrace.current}');
   }
 }
 
 Future<void> main(List<String> arguments) async {
-  final argParser = buildParser();
+  final argParser = CliOptions.buildParser();
   try {
-    final results = argParser.parse(arguments);
+    // Check if the first argument is a known command
+    final knownCommands = ['list', 'config'];
+    final hasCommand =
+        arguments.isNotEmpty && knownCommands.contains(arguments.first);
+
+    // If no command specified, default to 'list' by prepending it
+    final argsToparse = hasCommand ? arguments : ['list', ...arguments];
+
+    final results = argParser.parse(argsToparse);
 
     // Process the parsed arguments.
     if (results.flag('help')) {
@@ -559,73 +322,67 @@ Future<void> main(List<String> arguments) async {
     }
 
     final verbose = results.flag('verbose');
+    final timing = results.flag('timing');
 
-    // Get the repository path if specified
-    final repositoryPath = results.option('path');
+    // Initialize verbose output singleton
+    VerboseOutput.initialize(verbose);
+
+    // Determine which command to run (should always have a command now)
+    final command = results.command?.name ?? 'list';
+
+    // Get subcommand results
+    final subResults = results.command!;
 
     // Load config from ~/.dgt/.config
-    final config = await ConfigService.readConfig(verbose: verbose);
+    final config = await ConfigService.readConfig();
 
-    if (verbose && config != null) {
-      Terminal.info('[VERBOSE] Using config file settings:');
-      if (config.showLocal != null) {
-        Terminal.info('[VERBOSE]   local: ${config.showLocal}');
-      }
-      if (config.showGerrit != null) {
-        Terminal.info('[VERBOSE]   gerrit: ${config.showGerrit}');
-      }
-      if (config.showUrl != null) {
-        Terminal.info('[VERBOSE]   url: ${config.showUrl}');
-      }
-      if (config.filterStatuses != null && config.filterStatuses!.isNotEmpty) {
-        Terminal.info('[VERBOSE]   filterStatuses: ${config.filterStatuses}');
-      }
-      if (config.filterSince != null) {
-        Terminal.info('[VERBOSE]   filterSince: ${config.filterSince}');
-      }
-      if (config.filterBefore != null) {
-        Terminal.info('[VERBOSE]   filterBefore: ${config.filterBefore}');
-      }
-      if (config.filterDiverged != null) {
-        Terminal.info('[VERBOSE]   filterDiverged: ${config.filterDiverged}');
-      }
-      if (config.sortField != null) {
-        Terminal.info('[VERBOSE]   sortField: ${config.sortField}');
-      }
-      if (config.sortDirection != null) {
-        Terminal.info('[VERBOSE]   sortDirection: ${config.sortDirection}');
-      }
+    VerboseOutput.instance.printConfigSettings(config);
+
+    // Validate that conflicting flags are not used together
+    if (!FlagValidator.validateAllFlags(subResults)) {
+      return;
     }
 
     // Use centralized resolution helpers for filters and sort options
-    final statusFilters = config.resolveMultiOption(results, 'status', []);
-    final sinceStr = config.resolveOption(results, 'since', null);
-    final beforeStr = config.resolveOption(results, 'before', null);
-    final divergedFilter = config.resolveFlag(results, 'diverged', false);
+    // Handle --no-status flag to override config
+    List<String> statusFilters;
+    if (subResults.wasParsed('no-status') && subResults.flag('no-status')) {
+      // User explicitly wants to ignore status filters
+      statusFilters = [];
+    } else {
+      statusFilters = config.resolveMultiOption(subResults, 'status', []);
+    }
+
+    final sinceStr = config.resolveOption<String?>(subResults, 'since', null);
+    final beforeStr = config.resolveOption<String?>(subResults, 'before', null);
+
+    // Handle --no-diverged flag to override config
+    bool divergedFilter;
+    if (subResults.wasParsed('no-diverged') && subResults.flag('no-diverged')) {
+      // User explicitly wants to ignore diverged filter
+      divergedFilter = false;
+    } else {
+      divergedFilter = config.resolveFlag(subResults, 'diverged', false);
+    }
 
     // Resolve sort options using centralized helpers
-    final sortField = config.resolveOption(results, 'sort', null);
-
-    // Handle sort direction (asc/desc flags)
+    // Handle --no-sort flag to override config
+    String? sortField;
     String? sortDirection;
-    if (results.wasParsed('desc')) {
-      sortDirection = 'desc';
-    } else if (results.wasParsed('asc')) {
-      sortDirection = 'asc';
+
+    if (subResults.wasParsed('no-sort') && subResults.flag('no-sort')) {
+      // User explicitly wants to disable sorting
+      sortField = null;
+      sortDirection = null;
     } else {
-      // Use config file value if no CLI flag provided
-      sortDirection = config?.sortDirection;
+      sortField = config.resolveOption(subResults, 'sort', 'name');
+
+      // Handle sort direction using centralized helper
+      sortDirection = config.resolveSortDirection(subResults, 'asc');
     }
 
     // Validate status filters (from CLI or config file)
-    try {
-      statusFilters.forEach(validateStatus);
-    } catch (e) {
-      Terminal.error('$e');
-      Terminal.info('');
-      Terminal.info('Run "dgt --help" to see available status values.');
-      return;
-    }
+    statusFilters.forEach(validateStatus);
 
     // Validate sort field (from CLI or config file)
     try {
@@ -661,89 +418,96 @@ Future<void> main(List<String> arguments) async {
 
     final sortOptions = SortOptions(field: sortField, direction: sortDirection);
 
-    // Determine which command to run
-    final command = results.rest.isNotEmpty ? results.rest.first : 'list';
-
     // Execute the appropriate command
     switch (command) {
       case 'list':
+        // Get the repository path if specified
+        final repositoryPath = subResults.option('path');
+
         // Create DisplayOptions instance using factory constructor
         // which resolves values from CLI flags, config file, and defaults
         final displayOptions = DisplayOptions.resolve(
-          results: results,
+          results: subResults,
           config: config,
+          showTiming: timing,
         );
 
         await runListCommand(
-          verbose,
           repositoryPath,
           displayOptions,
           filters,
           sortOptions,
         );
       case 'config':
-        // For the config command, user must explicitly provide at least one
-        // flag
-        final hasDisplayFlags =
-            results.wasParsed('gerrit') ||
-            results.wasParsed('local') ||
-            results.wasParsed('url');
-        final hasFilterFlags =
-            results.wasParsed('status') ||
-            results.wasParsed('since') ||
-            results.wasParsed('before') ||
-            results.wasParsed('diverged');
-        final hasSortFlags =
-            results.wasParsed('sort') ||
-            results.wasParsed('no-sort') ||
-            results.wasParsed('asc') ||
-            results.wasParsed('desc');
+        // Initialize performance tracker if timing is requested
+        PerformanceTracker? configTracker;
+        if (timing) {
+          configTracker = PerformanceTracker();
+        }
 
-        if (!hasDisplayFlags && !hasFilterFlags && !hasSortFlags) {
-          Terminal.error(
-            'Error: You must specify at least one flag for the config command.',
-          );
-          Terminal.info('');
-          Terminal.info('Display options:');
-          Terminal.info('  dgt config --no-gerrit --local');
-          Terminal.info('');
-          Terminal.info('Filter options:');
-          Terminal.info('  dgt config --status Active --diverged');
-          Terminal.info('  dgt config --since 2025-10-01');
-          Terminal.info('');
-          Terminal.info('Sort options:');
-          Terminal.info('  dgt config --sort local-date --desc');
-          Terminal.info('');
-          Terminal.info(
-            'Use --gerrit/--no-gerrit, --local/--no-local, --url/--no-url, '
-            '--status, --since, --before, --diverged, --sort, --asc, --desc to '
-            'set defaults.',
-          );
+        // Check for subcommands
+        final subcommand = subResults.rest.isNotEmpty
+            ? subResults.rest[0]
+            : null;
+
+        if (subcommand == 'show') {
+          await runConfigShowCommand(tracker: configTracker);
+
+          // Display performance summary if timing was requested
+          if (timing && configTracker != null) {
+            OutputFormatter.displayPerformanceSummary(configTracker);
+          }
+          return;
+        }
+
+        if (subcommand == 'clean') {
+          final force =
+              subResults.wasParsed('force') && subResults.flag('force');
+          await runConfigCleanCommand(force, tracker: configTracker);
+
+          // Display performance summary if timing was requested
+          if (timing && configTracker != null) {
+            OutputFormatter.displayPerformanceSummary(configTracker);
+          }
+          return;
+        }
+
+        // For the config command, user must explicitly provide at least one
+        // flag or valid subcommand
+        if (!FlagValidator.hasConfigFlags(subResults)) {
+          printConfigHelp();
           return;
         }
 
         // Validate that asc and desc are not both specified
-        if (results.wasParsed('asc') && results.wasParsed('desc')) {
-          Terminal.error('Error: Cannot specify both --asc and --desc flags.');
-          Terminal.info('Please use only one sort direction flag.');
+        if (!FlagValidator.validateSortDirectionFlags(subResults)) {
           return;
         }
 
+        // Check for removal flags
+        final removeStatus =
+            subResults.wasParsed('no-status') && subResults.flag('no-status');
+        final removeDiverged =
+            subResults.wasParsed('no-diverged') &&
+            subResults.flag('no-diverged');
+        final removeSort =
+            subResults.wasParsed('no-sort') && subResults.flag('no-sort');
+
         // Extract config values from parsed arguments
-        final configToSave = DgtConfig.fromArgResults(results);
+        final configToSave = DgtConfig.fromArgResults(subResults);
 
         await runConfigCommand(
-          verbose,
-          configToSave.showGerrit,
-          configToSave.showLocal,
-          configToSave.showUrl,
-          configToSave.filterStatuses,
-          configToSave.filterSince,
-          configToSave.filterBefore,
-          configToSave.filterDiverged,
-          configToSave.sortField,
-          configToSave.sortDirection,
+          configToSave,
+          removeStatus,
+          removeDiverged,
+          removeSort,
+          tracker: configTracker,
         );
+
+        // Display performance summary if timing was requested
+        if (timing && configTracker != null) {
+          OutputFormatter.displayPerformanceSummary(configTracker);
+        }
       default:
         Terminal.error('Unknown command: $command');
         Terminal.info('');
@@ -754,26 +518,10 @@ Future<void> main(List<String> arguments) async {
     Terminal.error(e.message);
 
     // If it's about an invalid status value, show the available options
-    if (e.message.contains('--status')) {
-      Terminal.info('');
-      Terminal.info('Available status values:');
-      Terminal.info('  wip       - Work in Progress');
-      Terminal.info('  active    - Ready for review');
-      Terminal.info('  merged    - Successfully merged');
-      Terminal.info('  abandoned - Abandoned changes');
-      Terminal.info('  conflict  - Has merge conflicts');
-      Terminal.info('');
-      Terminal.info('Run "dgt --help" for more information.');
-    } else if (e.message.contains('--sort')) {
-      Terminal.info('');
-      Terminal.info('Available sort fields:');
-      Terminal.info('  local-date   - Sort by local date');
-      Terminal.info('  gerrit-date  - Sort by Gerrit date');
-      Terminal.info('  status       - Sort by Gerrit status');
-      Terminal.info('  name         - Sort by branch name');
-      Terminal.info('');
-      Terminal.info('Run "dgt --help" for more information.');
-      Terminal.info('');
+    if (e.message.contains('--sort')) {
+      FlagValidator.printSortHelp();
+    } else if (e.message.contains('--status')) {
+      FlagValidator.printStatusHelp();
     } else {
       Terminal.info('');
       printUsage(argParser);

@@ -348,6 +348,81 @@ This plan outlines the steps to build a Minimum Viable Product (MVP) for DGT - a
 - Centralizes precedence rules in one maintainable location
 - Keeps `bin/dgt.dart` cleaner and more readable
 
+### Phase 17: Enhanced Configuration Management and Status Filtering
+
+**Goal**: Provide comprehensive configuration management capabilities and support for filtering by all status types including local-only branches.
+
+**Implementation Steps**:
+
+- [x] Add ability to remove specific config options:
+  - [x] Implement `--no-status` flag to clear all status filters from config
+  - [x] Ensure all existing config options support removal via `--no-<option>` flags
+  - [x] Add validation to ensure removal flags work correctly
+- [x] Add config inspection command:
+  - [x] Implement `dgt config --show` or `dgt config show` to display current config file contents
+  - [x] Format output to show all current settings in a readable format
+  - [x] Handle case where config file doesn't exist
+- [x] Add config reset functionality:
+  - [x] Implement `dgt config --clean` or `dgt config clean` to reset config to defaults
+  - [x] Add confirmation prompt before cleaning (or `--force` flag to skip)
+  - [x] Document what "clean" means (empty config vs. default values)
+- [x] Enhance status filtering:
+  - [x] Add `--status gerrit` support as an alias for all accepted Gerrit statuses
+  - [x] Define "all" as: `[WIP, Active, Merge conflict, Merged, Abandoned]`
+  - [x] Add `--status local` support for branches without Gerrit configuration
+  - [x] Implement detection logic for local-only branches (no `gerritissue` in Git config)
+  - [x] Ensure `--status` can accept multiple values including combinations like `--status local --status Active`
+- [x] Update filtering logic in `lib/filtering.dart`:
+  - [x] Expand `applyFilters()` to handle `local` and `all` status values
+  - [x] When `all` is specified, include all Gerrit statuses but respect other filters
+  - [x] When `local` is specified, include branches where `gerritConfig == null`
+  - [x] Ensure filters are chainable and work correctly with saved config
+- [x] Update precedence rules:
+  - [x] Ensure CLI `--status` flags always override config file status settings
+  - [x] Ensure removal flags (`--no-status`) work correctly to override config for single run
+  - [x] Document precedence clearly: CLI flags > Config file > Built-in defaults
+- [x] Extend `ConfigService`:
+  - [x] Add methods: `showConfig()`, `cleanConfig()`, `removeOption(String key)`
+  - [x] Ensure all config write operations validate inputs
+  - [x] Add clear error messages for invalid operations
+- [x] Update `config` command in `bin/dgt.dart`:
+  - [x] Add subcommand support: `show` and `clean`
+  - [x] Add `--no-status` flag to remove all status filters
+  - [x] Update help text with examples of all new config operations
+- [x] Update `--help` text with new examples:
+  - [x] `dgt config show` (view current config)
+  - [x] `dgt config clean` (reset config to defaults)
+  - [x] `dgt config --no-status` (remove all status filters)
+  - [x] `dgt --status gerrit` (show all Gerrit statuses)
+  - [x] `dgt --status local` (show only local branches)
+  - [x] `dgt --status local --status active` (show local and active branches)
+- [ ] Update `README.md` with configuration management documentation:
+  - [ ] Document all config commands and flags
+  - [ ] Provide examples of common workflows
+  - [ ] Explain precedence rules clearly
+
+**Expected Behavior**:
+
+| Command | Effect |
+|---------|--------|
+| `dgt config --status active` | Save Active as default status filter |
+| `dgt config --no-status` | Remove all status filters from config |
+| `dgt config show` | Display current config file contents |
+| `dgt config clean` | Reset config to empty/default state |
+| `dgt --status gerrit` | Show all Gerrit statuses (WIP, Active, etc.) |
+| `dgt --status local` | Show only branches without Gerrit config |
+| `dgt --status local --status active` | Show local + Active branches |
+| `dgt --no-status` | Temporarily ignore config status filters |
+
+**Validation**:
+
+- [ ] Test that `--status gerrit` expands correctly to all Gerrit statuses
+- [ ] Test that `--status local` only shows branches without `gerritissue`
+- [ ] Test that multiple status filters combine correctly (OR logic)
+- [ ] Test that config removal flags work without affecting other settings
+- [ ] Test that `show` and `clean` commands work as expected
+- [ ] Test precedence: CLI overrides config overrides defaults
+
 ---
 
 ## Key Technical Details
