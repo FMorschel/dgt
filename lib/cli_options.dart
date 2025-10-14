@@ -17,7 +17,6 @@ class CliOptions {
   static const String before = 'before';
   static const String diverged = 'diverged';
   static const String noStatus = 'no-status';
-  static const String noDiverged = 'no-diverged';
 
   // Sort option names
   static const String sort = 'sort';
@@ -101,25 +100,25 @@ class CliOptions {
 
   /// Adds common display, filter, and sort options to a parser.
   /// Used by both 'list' and 'config' subcommands.
-  static void addCommonOptions(ArgParser parser) {
+  static void addCommonOptions(ArgParser parser, {bool allowNegated = true}) {
     // Display options
     parser
       ..addFlag(
         gerrit,
         defaultsTo: true,
-        negatable: true,
+        negatable: allowNegated,
         help: 'Display Gerrit hash and date columns.',
       )
       ..addFlag(
         local,
         defaultsTo: true,
-        negatable: true,
+        negatable: allowNegated,
         help: 'Display local hash and date columns.',
       )
       ..addFlag(
         url,
-        negatable: true,
         defaultsTo: false,
+        negatable: allowNegated,
         help: 'Show Gerrit URL column in the output.',
       );
 
@@ -146,7 +145,7 @@ class CliOptions {
       )
       ..addFlag(
         diverged,
-        negatable: true,
+        negatable: allowNegated,
         help: 'Filter to show only branches with local or remote differences.',
       )
       ..addFlag(
@@ -155,13 +154,6 @@ class CliOptions {
         help:
             'Ignore status filters (overrides config; cannot use with '
             '--$status).',
-      )
-      ..addFlag(
-        noDiverged,
-        negatable: false,
-        help:
-            'Ignore diverged filter (overrides config; cannot use with '
-            '--$diverged).',
       );
 
     // Sort options
@@ -213,24 +205,115 @@ class CliOptions {
 
     // Add 'list' subcommand (default command)
     final listParser = parser.addCommand('list');
-    listParser.addOption(
-      path,
-      abbr: 'p',
-      help: 'Path to the Git repository to analyze.',
-      valueHelp: 'path',
-    );
+    listParser
+      ..addFlag(
+        help,
+        abbr: 'h',
+        negatable: false,
+        help: 'Print help for the list command.',
+      )
+      ..addOption(
+        path,
+        abbr: 'p',
+        help: 'Path to the Git repository to analyze.',
+        valueHelp: 'path',
+      );
     addCommonOptions(listParser);
 
     // Add 'config' subcommand
     final configParser = parser.addCommand('config');
-    configParser.addFlag(
-      force,
-      abbr: 'f',
+    configParser
+      ..addFlag(
+        help,
+        abbr: 'h',
+        negatable: false,
+        help: 'Print help for the config command.',
+      )
+      ..addFlag(
+        force,
+        abbr: 'f',
+        negatable: false,
+        help: 'Force operation without confirmation (for config clean).',
+      );
+
+    // Add subcommands under config: show and clean
+    final configShow = configParser.addCommand('show');
+    configShow.addFlag(
+      help,
+      abbr: 'h',
       negatable: false,
-      help: 'Force operation without confirmation (for config clean).',
+      help: 'Print help for config show.',
     );
+
+    final configClean = configParser.addCommand('clean');
+    configClean
+      ..addFlag(
+        help,
+        abbr: 'h',
+        negatable: false,
+        help: 'Print help for config clean.',
+      )
+      ..addFlag(
+        force,
+        abbr: 'f',
+        negatable: false,
+        help: 'Force operation without confirmation.',
+      );
+
+    // For the top-level config command (used to set defaults), use the
+    // full set of common options. For the 'config clean' subcommand we want
+    // only affirmative options (no --no- forms).
     addCommonOptions(configParser);
+    addCommonOptions(configClean, allowNegated: false);
+
+    // Add 'clean' subcommand
+    // This command wraps 'git cl archive' and passes through all arguments
+    // We don't define any options here because all arguments (including flags)
+    // should be forwarded to 'git cl archive'. The parser will treat everything
+    // after 'clean' as rest arguments that can be passed through.
+    parser.addCommand('clean', ArgParser(allowTrailingOptions: false));
 
     return parser;
   }
+}
+
+/// Represents removable configuration options
+/// This enum ensures exhaustive handling of all removable options
+enum RemovableConfigOption {
+  status,
+  diverged,
+  sort,
+  local,
+  gerrit,
+  url,
+  since,
+  before;
+
+  /// Create from string representation
+  /// Returns null if the option name is not valid
+  static RemovableConfigOption? fromString(String optionName) {
+    return switch (optionName) {
+      'status' => RemovableConfigOption.status,
+      'diverged' => RemovableConfigOption.diverged,
+      'sort' => RemovableConfigOption.sort,
+      'local' => RemovableConfigOption.local,
+      'gerrit' => RemovableConfigOption.gerrit,
+      'url' => RemovableConfigOption.url,
+      'since' => RemovableConfigOption.since,
+      'before' => RemovableConfigOption.before,
+      _ => null,
+    };
+  }
+
+  /// Display name for this option
+  String get displayName => switch (this) {
+    RemovableConfigOption.status => 'status',
+    RemovableConfigOption.diverged => 'diverged',
+    RemovableConfigOption.sort => 'sort',
+    RemovableConfigOption.local => 'local',
+    RemovableConfigOption.gerrit => 'gerrit',
+    RemovableConfigOption.url => 'url',
+    RemovableConfigOption.since => 'since',
+    RemovableConfigOption.before => 'before',
+  };
 }

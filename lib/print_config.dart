@@ -17,7 +17,9 @@ void printConfigHelp() {
   Terminal.info('  dgt config --status active --diverged');
   Terminal.info('  dgt config --since 2025-10-01');
   Terminal.info('  dgt config --no-status        # Remove all status filters');
-  Terminal.info('  dgt config --no-diverged      # Remove diverged filter');
+  Terminal.info(
+    '  dgt config --no-diverged      # Set diverged default to false',
+  );
   Terminal.info('');
   Terminal.info('Sort options:');
   Terminal.info('  dgt config --sort local-date --desc');

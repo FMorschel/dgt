@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:args/args.dart';
 
+import 'cli_options.dart';
 import 'verbose_output.dart';
 
 /// Configuration options for the dgt tool
@@ -526,9 +527,25 @@ class ConfigService {
     }
   }
 
-  /// Remove a specific option from the configuration
-  static Future<void> removeOption(String optionName) async {
+  /// Remove specific options from the configuration
+  ///
+  /// If [removals] is null or empty, all configuration is removed (same as
+  /// cleanConfig).
+  /// If [removals] contains specific items, only those options are removed.
+  ///
+  /// For list-based options (status), provide a value to remove only that item.
+  /// For conditional options (sort), provide a value to remove only if it
+  /// matches.
+  static Future<void> removeOptions(
+    List<({RemovableConfigOption option, String? value})>? removals,
+  ) async {
     try {
+      // If no options specified, perform full clean
+      if (removals == null || removals.isEmpty) {
+        await cleanConfig(force: true);
+        return;
+      }
+
       // Read existing config
       final existingConfig = await readConfig();
 
@@ -537,61 +554,195 @@ class ConfigService {
         return;
       }
 
-      // Create a new config with the specified option removed
-      DgtConfig newConfig;
+      // Start with existing config and remove each requested option
+      var newConfig = existingConfig;
+      final removedItems = <String>[];
 
-      switch (optionName) {
-        case 'status':
-          newConfig = DgtConfig(
-            showLocal: existingConfig.showLocal,
-            showGerrit: existingConfig.showGerrit,
-            showUrl: existingConfig.showUrl,
-            filterStatuses: null, // Remove status filters
-            filterSince: existingConfig.filterSince,
-            filterBefore: existingConfig.filterBefore,
-            filterDiverged: existingConfig.filterDiverged,
-            sortField: existingConfig.sortField,
-            sortDirection: existingConfig.sortDirection,
-          );
-        case 'diverged':
-          newConfig = DgtConfig(
-            showLocal: existingConfig.showLocal,
-            showGerrit: existingConfig.showGerrit,
-            showUrl: existingConfig.showUrl,
-            filterStatuses: existingConfig.filterStatuses,
-            filterSince: existingConfig.filterSince,
-            filterBefore: existingConfig.filterBefore,
-            filterDiverged: null, // Remove diverged filter
-            sortField: existingConfig.sortField,
-            sortDirection: existingConfig.sortDirection,
-          );
-        case 'sort':
-          newConfig = DgtConfig(
-            showLocal: existingConfig.showLocal,
-            showGerrit: existingConfig.showGerrit,
-            showUrl: existingConfig.showUrl,
-            filterStatuses: existingConfig.filterStatuses,
-            filterSince: existingConfig.filterSince,
-            filterBefore: existingConfig.filterBefore,
-            filterDiverged: existingConfig.filterDiverged,
-            sortField: null, // Remove sort options
-            sortDirection: null,
-          );
-        default:
-          print('Unknown option: $optionName');
-          print('Valid options: status, diverged, sort');
-          return;
+      for (final removal in removals) {
+        final option = removal.option;
+        final value = removal.value;
+
+        // Create a new config with the specified option removed
+        // Using exhaustive switch expression
+        final updated = switch (option) {
+          RemovableConfigOption.status => () {
+            // For status, support removing specific values from the list
+            if (value != null && newConfig.filterStatuses != null) {
+              final updatedList = newConfig.filterStatuses!
+                  .where((status) => status != value)
+                  .toList();
+              // If list becomes empty, set to null to remove from config
+              final newStatuses = updatedList.isEmpty ? null : updatedList;
+              removedItems.add(
+                newStatuses == null ? 'status' : 'status:$value',
+              );
+              return DgtConfig(
+                showLocal: newConfig.showLocal,
+                showGerrit: newConfig.showGerrit,
+                showUrl: newConfig.showUrl,
+                filterStatuses: newStatuses,
+                filterSince: newConfig.filterSince,
+                filterBefore: newConfig.filterBefore,
+                filterDiverged: newConfig.filterDiverged,
+                sortField: newConfig.sortField,
+                sortDirection: newConfig.sortDirection,
+              );
+            } else {
+              // No value specified or no existing statuses, remove entire
+              // option
+              removedItems.add('status');
+              return DgtConfig(
+                showLocal: newConfig.showLocal,
+                showGerrit: newConfig.showGerrit,
+                showUrl: newConfig.showUrl,
+                filterStatuses: null, // Remove status filters
+                filterSince: newConfig.filterSince,
+                filterBefore: newConfig.filterBefore,
+                filterDiverged: newConfig.filterDiverged,
+                sortField: newConfig.sortField,
+                sortDirection: newConfig.sortDirection,
+              );
+            }
+          }(),
+          RemovableConfigOption.diverged => () {
+            removedItems.add('diverged');
+            return DgtConfig(
+              showLocal: newConfig.showLocal,
+              showGerrit: newConfig.showGerrit,
+              showUrl: newConfig.showUrl,
+              filterStatuses: newConfig.filterStatuses,
+              filterSince: newConfig.filterSince,
+              filterBefore: newConfig.filterBefore,
+              filterDiverged: null, // Remove diverged filter
+              sortField: newConfig.sortField,
+              sortDirection: newConfig.sortDirection,
+            );
+          }(),
+          RemovableConfigOption.sort => () {
+            // For sort, support conditional removal based on current value
+            if (value != null) {
+              // Only remove if current sort field matches the specified value
+              if (newConfig.sortField == value) {
+                removedItems.add('sort:$value');
+                return DgtConfig(
+                  showLocal: newConfig.showLocal,
+                  showGerrit: newConfig.showGerrit,
+                  showUrl: newConfig.showUrl,
+                  filterStatuses: newConfig.filterStatuses,
+                  filterSince: newConfig.filterSince,
+                  filterBefore: newConfig.filterBefore,
+                  filterDiverged: newConfig.filterDiverged,
+                  sortField: null, // Remove sort options
+                  sortDirection: null,
+                );
+              } else {
+                // Value doesn't match, don't remove
+                return newConfig;
+              }
+            } else {
+              // No value specified, remove entire sort configuration
+              removedItems.add('sort');
+              return DgtConfig(
+                showLocal: newConfig.showLocal,
+                showGerrit: newConfig.showGerrit,
+                showUrl: newConfig.showUrl,
+                filterStatuses: newConfig.filterStatuses,
+                filterSince: newConfig.filterSince,
+                filterBefore: newConfig.filterBefore,
+                filterDiverged: newConfig.filterDiverged,
+                sortField: null, // Remove sort options
+                sortDirection: null,
+              );
+            }
+          }(),
+          RemovableConfigOption.local => () {
+            removedItems.add('local');
+            return DgtConfig(
+              showLocal: null, // Remove local display setting
+              showGerrit: newConfig.showGerrit,
+              showUrl: newConfig.showUrl,
+              filterStatuses: newConfig.filterStatuses,
+              filterSince: newConfig.filterSince,
+              filterBefore: newConfig.filterBefore,
+              filterDiverged: newConfig.filterDiverged,
+              sortField: newConfig.sortField,
+              sortDirection: newConfig.sortDirection,
+            );
+          }(),
+          RemovableConfigOption.gerrit => () {
+            removedItems.add('gerrit');
+            return DgtConfig(
+              showLocal: newConfig.showLocal,
+              showGerrit: null, // Remove gerrit display setting
+              showUrl: newConfig.showUrl,
+              filterStatuses: newConfig.filterStatuses,
+              filterSince: newConfig.filterSince,
+              filterBefore: newConfig.filterBefore,
+              filterDiverged: newConfig.filterDiverged,
+              sortField: newConfig.sortField,
+              sortDirection: newConfig.sortDirection,
+            );
+          }(),
+          RemovableConfigOption.url => () {
+            removedItems.add('url');
+            return DgtConfig(
+              showLocal: newConfig.showLocal,
+              showGerrit: newConfig.showGerrit,
+              showUrl: null, // Remove url display setting
+              filterStatuses: newConfig.filterStatuses,
+              filterSince: newConfig.filterSince,
+              filterBefore: newConfig.filterBefore,
+              filterDiverged: newConfig.filterDiverged,
+              sortField: newConfig.sortField,
+              sortDirection: newConfig.sortDirection,
+            );
+          }(),
+          RemovableConfigOption.since => () {
+            removedItems.add('since');
+            return DgtConfig(
+              showLocal: newConfig.showLocal,
+              showGerrit: newConfig.showGerrit,
+              showUrl: newConfig.showUrl,
+              filterStatuses: newConfig.filterStatuses,
+              filterSince: null, // Remove since filter
+              filterBefore: newConfig.filterBefore,
+              filterDiverged: newConfig.filterDiverged,
+              sortField: newConfig.sortField,
+              sortDirection: newConfig.sortDirection,
+            );
+          }(),
+          RemovableConfigOption.before => () {
+            removedItems.add('before');
+            return DgtConfig(
+              showLocal: newConfig.showLocal,
+              showGerrit: newConfig.showGerrit,
+              showUrl: newConfig.showUrl,
+              filterStatuses: newConfig.filterStatuses,
+              filterSince: newConfig.filterSince,
+              filterBefore: null, // Remove before filter
+              filterDiverged: newConfig.filterDiverged,
+              sortField: newConfig.sortField,
+              sortDirection: newConfig.sortDirection,
+            );
+          }(),
+        };
+
+        newConfig = updated;
       }
 
       // Write the updated config
       await writeConfig(newConfig);
 
-      print('Removed "$optionName" from configuration.');
+      if (removedItems.isNotEmpty) {
+        print('Removed [${removedItems.join(', ')}] from configuration.');
+      } else {
+        print('No matching configuration items to remove.');
+      }
 
       VerboseOutput.instance.info('[VERBOSE] Updated config file');
     } catch (e) {
-      VerboseOutput.instance.info('[VERBOSE] Error removing option: $e');
-      print('Error removing option: $e');
+      VerboseOutput.instance.info('[VERBOSE] Error removing options: $e');
+      print('Error removing options: $e');
     }
   }
 }
