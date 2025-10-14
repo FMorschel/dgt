@@ -342,7 +342,7 @@ The following requirements capture user requests and open issues identified for 
      - Ensure all config options can be removed or overridden locally via CLI flags.
      - Provide a command to clean/reset the entire config file to defaults.
      - Provide a command to display the current config file contents.
-     - Support `--status all` as an alias to show all accepted status values (WIP, Active, Merge conflict, Merged, Abandoned).
+     - Support `--status gerrit` as an alias to show all accepted status values related to Gerrit (WIP, Active, Merge conflict, Merged, Abandoned).
      - Support `--status local` option to filter branches that have not been sent to Gerrit (branches without gerritissue configuration).
      - CLI flags must always take precedence over config file settings.
      - Config commands should validate inputs and provide clear error messages for invalid operations.

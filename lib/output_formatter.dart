@@ -16,12 +16,10 @@ class OutputFormatter {
   /// Formats and displays a list of branch information.
   ///
   /// [branchInfoList] - List of BranchInfo objects to display
-  /// [verbose] - Whether to show verbose output
   /// [sortField] - The field used for sorting (if any)
   /// [sortDirection] - The direction used for sorting (if any)
   void displayBranchTable(
     List<BranchInfo> branchInfoList, {
-    bool verbose = false,
     String? sortField,
     String? sortDirection,
   }) {

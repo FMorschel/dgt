@@ -29,14 +29,16 @@ class DisplayOptions {
   ///
   /// [results] - Parsed command-line arguments
   /// [config] - Configuration loaded from file (optional)
+  /// [showTiming] - Whether to show timing (from global flag)
   factory DisplayOptions.resolve({
     required ArgResults results,
     required DgtConfig? config,
+    required bool showTiming,
   }) {
     return DisplayOptions(
       showGerrit: config.resolveFlag(results, 'gerrit', true),
       showLocal: config.resolveFlag(results, 'local', true),
-      showTiming: results.flag('timing'),
+      showTiming: showTiming,
       showUrl: config.resolveFlag(results, 'url', false),
     );
   }

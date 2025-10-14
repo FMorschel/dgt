@@ -1,4 +1,5 @@
 import 'branch_info.dart';
+import 'cli_options.dart';
 
 /// Options for filtering branches.
 class FilterOptions {
@@ -43,61 +44,16 @@ DateTime? parseDate(String? dateStr) {
   }
 }
 
-/// Maps CLI-friendly status values to display values.
-const Map<String, String> statusMapping = {
-  'wip': 'WIP',
-  'active': 'Active',
-  'merged': 'Merged',
-  'abandoned': 'Abandoned',
-  'conflict': 'Merge conflict',
-};
-
-/// Human-readable descriptions for status values.
-const Map<String, String> statusDescriptions = {
-  'wip': 'Work in Progress',
-  'active': 'Ready for review',
-  'merged': 'Successfully merged',
-  'abandoned': 'Abandoned changes',
-  'conflict': 'Has merge conflicts',
-};
-
-/// All accepted Gerrit status values (for --status all)
-const List<String> allGerritStatuses = [
-  'WIP',
-  'Active',
-  'Merged',
-  'Abandoned',
-  'Merge conflict',
-];
-
-/// Special status value to indicate local-only branches
-const String localStatusValue = 'local';
-
 /// Validates status value against allowed values.
 ///
 /// Throws FormatException if status is invalid.
-/// Allows special values: 'all' and 'local'
+/// Allows special values: 'gerrit' and 'local'
 void validateStatus(String status) {
   final lowerStatus = status.toLowerCase();
 
-  // Allow special status values
-  if (lowerStatus == 'all' || lowerStatus == 'local') {
-    return;
-  }
-
-  if (!statusMapping.containsKey(lowerStatus)) {
-    final allowedValues = statusMapping.keys
-        .map((key) {
-          return '$key (${statusDescriptions[key]})';
-        })
-        .join('\n    ');
-
+  if (!CliOptions.statusMapping.containsKey(lowerStatus)) {
     throw FormatException(
-      'Invalid status: "$status".\n'
-      'Allowed values:\n'
-      '    $allowedValues\n'
-      '    all (All Gerrit statuses)\n'
-      '    local (Branches without Gerrit configuration)',
+      'The current --status given value "$status" is not valid.',
     );
   }
 }
@@ -122,27 +78,26 @@ List<BranchInfo> applyFilters(
 
   // Apply status filter
   if (filters.statuses != null && filters.statuses!.isNotEmpty) {
-    // Check if 'all' is in the statuses
-    final hasAll = filters.statuses!.any((s) => s.toLowerCase() == 'all');
+    // Check if 'gerrit' is in the statuses
+    final hasGerrit = filters.statuses!.any((s) => s.toLowerCase() == 'gerrit');
 
     // Check if 'local' is in the statuses
     final hasLocal = filters.statuses!.any((s) => s.toLowerCase() == 'local');
 
-    // Get the regular status filters (excluding 'all' and 'local')
+    // Get the regular status filters (excluding 'gerrit' and 'local')
     final regularStatuses = filters.statuses!
-        .where((s) => s.toLowerCase() != 'all' && s.toLowerCase() != 'local')
-        .map((s) => statusMapping[s.toLowerCase()] ?? s)
+        .map((s) => CliOptions.statusMapping[s.toLowerCase()] ?? s)
         .toList();
 
     // Build the combined status list
     final displayStatuses = <String>[];
 
-    if (hasAll) {
+    if (hasGerrit) {
       // Add all Gerrit statuses
-      displayStatuses.addAll(allGerritStatuses);
+      displayStatuses.addAll(CliOptions.allGerritStatuses);
     }
 
-    // Add regular statuses (if not already included via 'all')
+    // Add regular statuses (if not already included via 'gerrit')
     for (final status in regularStatuses) {
       if (!displayStatuses.contains(status)) {
         displayStatuses.add(status);
@@ -157,8 +112,8 @@ List<BranchInfo> applyFilters(
         return true;
       }
 
-      // If 'all' is specified, include all branches with Gerrit config
-      if (hasAll && hasGerritConfig) {
+      // If 'gerrit' is specified, include all branches with Gerrit config
+      if (hasGerrit && hasGerritConfig) {
         return true;
       }
 

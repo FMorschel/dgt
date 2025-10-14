@@ -367,7 +367,7 @@ This plan outlines the steps to build a Minimum Viable Product (MVP) for DGT - a
   - [x] Add confirmation prompt before cleaning (or `--force` flag to skip)
   - [x] Document what "clean" means (empty config vs. default values)
 - [x] Enhance status filtering:
-  - [x] Add `--status all` support as an alias for all accepted Gerrit statuses
+  - [x] Add `--status gerrit` support as an alias for all accepted Gerrit statuses
   - [x] Define "all" as: `[WIP, Active, Merge conflict, Merged, Abandoned]`
   - [x] Add `--status local` support for branches without Gerrit configuration
   - [x] Implement detection logic for local-only branches (no `gerritissue` in Git config)
@@ -393,7 +393,7 @@ This plan outlines the steps to build a Minimum Viable Product (MVP) for DGT - a
   - [x] `dgt config show` (view current config)
   - [x] `dgt config clean` (reset config to defaults)
   - [x] `dgt config --no-status` (remove all status filters)
-  - [x] `dgt --status all` (show all Gerrit statuses)
+  - [x] `dgt --status gerrit` (show all Gerrit statuses)
   - [x] `dgt --status local` (show only local branches)
   - [x] `dgt --status local --status active` (show local and active branches)
 - [ ] Update `README.md` with configuration management documentation:
@@ -409,14 +409,14 @@ This plan outlines the steps to build a Minimum Viable Product (MVP) for DGT - a
 | `dgt config --no-status` | Remove all status filters from config |
 | `dgt config show` | Display current config file contents |
 | `dgt config clean` | Reset config to empty/default state |
-| `dgt --status all` | Show all Gerrit statuses (WIP, Active, etc.) |
+| `dgt --status gerrit` | Show all Gerrit statuses (WIP, Active, etc.) |
 | `dgt --status local` | Show only branches without Gerrit config |
 | `dgt --status local --status active` | Show local + Active branches |
 | `dgt --no-status` | Temporarily ignore config status filters |
 
 **Validation**:
 
-- [ ] Test that `--status all` expands correctly to all Gerrit statuses
+- [ ] Test that `--status gerrit` expands correctly to all Gerrit statuses
 - [ ] Test that `--status local` only shows branches without `gerritissue`
 - [ ] Test that multiple status filters combine correctly (OR logic)
 - [ ] Test that config removal flags work without affecting other settings

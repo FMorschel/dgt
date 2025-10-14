@@ -1,4 +1,5 @@
 import 'branch_info.dart';
+import 'cli_options.dart';
 
 /// Options for sorting branches.
 class SortOptions {
@@ -20,32 +21,14 @@ class SortOptions {
   bool get isAscending => !isDescending;
 }
 
-/// Allowed sort field values.
-const List<String> allowedSortFields = [
-  'local-date',
-  'gerrit-date',
-  'status',
-  'divergences',
-  'name',
-];
-
-/// Human-readable descriptions for sort fields.
-const Map<String, String> sortFieldDescriptions = {
-  'local-date': 'Local commit date',
-  'gerrit-date': 'Gerrit update date',
-  'status': 'Gerrit status',
-  'divergences': 'Divergence state (both, one side, in sync)',
-  'name': 'Branch name',
-};
-
 /// Validates sort field against allowed values.
 ///
 /// Throws FormatException if field is invalid.
 void validateSortField(String field) {
-  if (!allowedSortFields.contains(field.toLowerCase())) {
-    final allowedValues = allowedSortFields
+  if (!CliOptions.allowedSortFields.contains(field.toLowerCase())) {
+    final allowedValues = CliOptions.allowedSortFields
         .map((key) {
-          return '$key (${sortFieldDescriptions[key]})';
+          return '$key (${CliOptions.sortFieldDescriptions[key]})';
         })
         .join('\n    ');
 
