@@ -333,94 +333,106 @@ Future<void> main(List<String> arguments) async {
     // Get subcommand results
     final subResults = results.command!;
 
-    // Load config from ~/.dgt/.config
-    final config = await ConfigService.readConfig();
-
-    VerboseOutput.instance.printConfigSettings(config);
-
-    // Validate that conflicting flags are not used together
-    if (!FlagValidator.validateAllFlags(subResults)) {
-      return;
-    }
-
-    // Use centralized resolution helpers for filters and sort options
-    // Handle --no-status flag to override config
-    List<String> statusFilters;
-    if (subResults.wasParsed('no-status') && subResults.flag('no-status')) {
-      // User explicitly wants to ignore status filters
-      statusFilters = [];
-    } else {
-      statusFilters = config.resolveMultiOption(subResults, 'status', []);
-    }
-
-    final sinceStr = config.resolveOption<String?>(subResults, 'since', null);
-    final beforeStr = config.resolveOption<String?>(subResults, 'before', null);
-
-    // Handle --no-diverged flag to override config
-    bool divergedFilter;
-    if (subResults.wasParsed('no-diverged') && subResults.flag('no-diverged')) {
-      // User explicitly wants to ignore diverged filter
-      divergedFilter = false;
-    } else {
-      divergedFilter = config.resolveFlag(subResults, 'diverged', false);
-    }
-
-    // Resolve sort options using centralized helpers
-    // Handle --no-sort flag to override config
-    String? sortField;
-    String? sortDirection;
-
-    if (subResults.wasParsed('no-sort') && subResults.flag('no-sort')) {
-      // User explicitly wants to disable sorting
-      sortField = null;
-      sortDirection = null;
-    } else {
-      sortField = config.resolveOption(subResults, 'sort', 'name');
-
-      // Handle sort direction using centralized helper
-      sortDirection = config.resolveSortDirection(subResults, 'asc');
-    }
-
-    // Validate status filters (from CLI or config file)
-    statusFilters.forEach(validateStatus);
-
-    // Validate sort field (from CLI or config file)
-    try {
-      if (sortField != null) {
-        validateSortField(sortField);
-      }
-      if (sortDirection != null) {
-        validateSortDirection(sortDirection);
-      }
-    } catch (e) {
-      Terminal.error('Error: $e');
-      return;
-    }
-
-    // Validate and parse dates
-    DateTime? sinceDate;
-    DateTime? beforeDate;
-
-    try {
-      sinceDate = parseDate(sinceStr);
-      beforeDate = parseDate(beforeStr);
-    } catch (e) {
-      Terminal.error('Error: $e');
-      return;
-    }
-
-    final filters = FilterOptions(
-      statuses: statusFilters.isNotEmpty ? statusFilters : null,
-      since: sinceDate,
-      before: beforeDate,
-      diverged: divergedFilter,
-    );
-
-    final sortOptions = SortOptions(field: sortField, direction: sortDirection);
-
     // Execute the appropriate command
     switch (command) {
       case 'list':
+        // Load config from ~/.dgt/.config
+        final config = await ConfigService.readConfig();
+
+        VerboseOutput.instance.printConfigSettings(config);
+
+        // Validate that conflicting flags are not used together
+        if (!FlagValidator.validateAllFlags(subResults)) {
+          return;
+        }
+
+        // Use centralized resolution helpers for filters and sort options
+        // Handle --no-status flag to override config
+        List<String> statusFilters;
+        if (subResults.wasParsed('no-status') && subResults.flag('no-status')) {
+          // User explicitly wants to ignore status filters
+          statusFilters = [];
+        } else {
+          statusFilters = config.resolveMultiOption(subResults, 'status', []);
+        }
+
+        final sinceStr = config.resolveOption<String?>(
+          subResults,
+          'since',
+          null,
+        );
+        final beforeStr = config.resolveOption<String?>(
+          subResults,
+          'before',
+          null,
+        );
+
+        // Handle --no-diverged flag to override config
+        bool divergedFilter;
+        if (subResults.wasParsed('no-diverged') &&
+            subResults.flag('no-diverged')) {
+          // User explicitly wants to ignore diverged filter
+          divergedFilter = false;
+        } else {
+          divergedFilter = config.resolveFlag(subResults, 'diverged', false);
+        }
+
+        // Resolve sort options using centralized helpers
+        // Handle --no-sort flag to override config
+        String? sortField;
+        String? sortDirection;
+
+        if (subResults.wasParsed('no-sort') && subResults.flag('no-sort')) {
+          // User explicitly wants to disable sorting
+          sortField = null;
+          sortDirection = null;
+        } else {
+          sortField = config.resolveOption(subResults, 'sort', 'name');
+
+          // Handle sort direction using centralized helper
+          sortDirection = config.resolveSortDirection(subResults, 'asc');
+        }
+
+        // Validate status filters (from CLI or config file)
+        statusFilters.forEach(validateStatus);
+
+        // Validate sort field (from CLI or config file)
+        try {
+          if (sortField != null) {
+            validateSortField(sortField);
+          }
+          if (sortDirection != null) {
+            validateSortDirection(sortDirection);
+          }
+        } catch (e) {
+          Terminal.error('Error: $e');
+          return;
+        }
+
+        // Validate and parse dates
+        DateTime? sinceDate;
+        DateTime? beforeDate;
+
+        try {
+          sinceDate = parseDate(sinceStr);
+          beforeDate = parseDate(beforeStr);
+        } catch (e) {
+          Terminal.error('Error: $e');
+          return;
+        }
+
+        final filters = FilterOptions(
+          statuses: statusFilters.isNotEmpty ? statusFilters : null,
+          since: sinceDate,
+          before: beforeDate,
+          diverged: divergedFilter,
+        );
+
+        final sortOptions = SortOptions(
+          field: sortField,
+          direction: sortDirection,
+        );
+
         // Get the repository path if specified
         final repositoryPath = subResults.option('path');
 

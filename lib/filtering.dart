@@ -120,7 +120,11 @@ List<BranchInfo> applyFilters(
       // Handle regular Gerrit statuses
       if (displayStatuses.isNotEmpty && hasGerritConfig) {
         final status = branch.getDisplayStatus();
-        return displayStatuses.contains(status);
+        // Check if status starts with any of the display statuses
+        // This handles cases like "Active (LGTM +1)" matching "Active"
+        return displayStatuses.any(
+          (s) => status.toLowerCase().startsWith(s.toLowerCase()),
+        );
       }
 
       return false;
