@@ -26,26 +26,23 @@ Future<void> runCleanCommand(
       '[VERBOSE] Executing: $command ${args.join(' ')}',
     );
 
-    // Run the git cl archive command
-    final result = await Process.run(command, args, runInShell: true);
+    // Start the git cl archive command with interactive mode
+    final process = await Process.start(
+      command,
+      args,
+      mode: ProcessStartMode.inheritStdio,
+    );
 
-    // Display the output from git cl archive
-    if (result.stdout.toString().isNotEmpty) {
-      Terminal.info(result.stdout.toString().trim());
-    }
-
-    // Display any errors
-    if (result.stderr.toString().isNotEmpty) {
-      Terminal.error(result.stderr.toString().trim());
-    }
+    // Wait for the process to complete
+    final exitCode = await process.exitCode;
 
     // Check exit code
-    if (result.exitCode != 0) {
+    if (exitCode != 0) {
       VerboseOutput.instance.warning(
-        '[VERBOSE] Command exited with code: ${result.exitCode}',
+        '[VERBOSE] Command exited with code: $exitCode',
       );
       tracker?.endTimer('clean_command');
-      exit(result.exitCode);
+      exit(exitCode);
     }
 
     VerboseOutput.instance.info('[VERBOSE] Command completed successfully');
