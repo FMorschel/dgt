@@ -1,3 +1,4 @@
+import 'branch_status.dart';
 import 'gerrit_service.dart';
 import 'git_service.dart';
 
@@ -34,11 +35,25 @@ class BranchInfo {
   /// The URL for the Gerrit change (nullable if not available)
   final String? gerritUrl;
 
+  /// The state this branch is in.
+  ///
+  /// [BranchStatus.none] when no Gerrit change was found, and null when Gerrit
+  /// reported a status this tool does not model. Filtering, sorting and colour
+  /// selection read this; only the text of the Status column comes from
+  /// [getDisplayStatus].
+  BranchStatus? get branchStatus {
+    final change = gerritChange;
+    if (change == null) {
+      return .none;
+    }
+    return change.branchStatus;
+  }
+
   /// Gets the user-friendly status for display.
   /// Returns the Gerrit status or "-" if no Gerrit change exists.
   String getDisplayStatus() {
     if (gerritChange == null) {
-      return '-';
+      return BranchStatus.none.displayPrefix;
     }
     return gerritChange!.getUserFriendlyStatus();
   }

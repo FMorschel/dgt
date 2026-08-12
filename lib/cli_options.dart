@@ -1,5 +1,7 @@
 import 'package:args/args.dart';
 
+import 'branch_status.dart';
+
 /// Metadata for CLI options used across the application.
 /// This centralizes option definitions so they can be reused for:
 /// - Building the ArgParser
@@ -34,51 +36,39 @@ class CliOptions {
   static const String path = 'path';
   static const String force = 'force';
 
-  /// Allowed status values for filtering.
-  static const List<String> allowedStatusValues = [
-    'wip',
-    'active',
-    'merged',
-    'abandoned',
-    'conflict',
-    'gerrit',
-    'local',
-  ];
-
-  /// Maps CLI-friendly status values to display values.
-  static const Map<String, String> statusMapping = {
-    'wip': 'WIP',
-    'active': 'Active',
-    'merged': 'Merged',
-    'abandoned': 'Abandoned',
-    'conflict': 'Merge conflict',
-    // Special values
-    'gerrit': '',
-    'local': '',
-  };
-
-  /// Human-readable descriptions for status values.
-  static const Map<String, String> statusDescriptions = {
-    'wip': 'Work in Progress',
-    'active': 'Ready for review',
-    'merged': 'Successfully merged',
-    'abandoned': 'Abandoned changes',
-    'conflict': 'Has merge conflicts',
-    'gerrit': 'All Gerrit statuses',
-    'local': 'Branches without Gerrit configuration',
-  };
-
-  /// All accepted Gerrit status values (for --status gerrit)
-  static const List<String> allGerritStatuses = [
-    'WIP',
-    'Active',
-    'Merged',
-    'Abandoned',
-    'Merge conflict',
-  ];
+  /// Special status value selecting every branch that has a Gerrit change.
+  static const String gerritStatusValue = 'gerrit';
 
   /// Special status value to indicate local-only branches
   static const String localStatusValue = 'local';
+
+  /// Allowed status values for filtering.
+  ///
+  /// The real statuses come from [BranchStatus]; the two special values select
+  /// groups of branches rather than a single status.
+  static final List<String> allowedStatusValues = [
+    for (final status in BranchStatus.values) ?status.cliValue,
+    gerritStatusValue,
+    localStatusValue,
+  ];
+
+  /// Maps CLI-friendly status values to the text a display status starts with.
+  ///
+  /// Only real statuses appear here. [gerritStatusValue] and
+  /// [localStatusValue] are deliberately absent: they have no display prefix,
+  /// and an empty prefix would match every status.
+  static final Map<String, String> statusMapping = {
+    for (final status in BranchStatus.values)
+      ?status.cliValue: status.displayPrefix,
+  };
+
+  /// Human-readable descriptions for status values.
+  static final Map<String, String> statusDescriptions = {
+    for (final status in BranchStatus.values)
+      ?status.cliValue: ?status.description,
+    gerritStatusValue: 'All Gerrit statuses',
+    localStatusValue: 'Branches without Gerrit configuration',
+  };
 
   /// Allowed sort field values.
   static const List<String> allowedSortFields = [

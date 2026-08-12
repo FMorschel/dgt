@@ -1,4 +1,5 @@
 import 'branch_info.dart';
+import 'branch_status.dart';
 import 'cli_options.dart';
 
 /// Options for filtering branches.
@@ -51,7 +52,7 @@ DateTime? parseDate(String? dateStr) {
 void validateStatus(String status) {
   final lowerStatus = status.toLowerCase();
 
-  if (!CliOptions.statusMapping.containsKey(lowerStatus)) {
+  if (!CliOptions.allowedStatusValues.contains(lowerStatus)) {
     throw FormatException(
       'The current --status given value "$status" is not valid.',
     );
@@ -78,31 +79,22 @@ List<BranchInfo> applyFilters(
 
   // Apply status filter
   if (filters.statuses != null && filters.statuses!.isNotEmpty) {
-    // Check if 'gerrit' is in the statuses
-    final hasGerrit = filters.statuses!.any((s) => s.toLowerCase() == 'gerrit');
-
-    // Check if 'local' is in the statuses
-    final hasLocal = filters.statuses!.any((s) => s.toLowerCase() == 'local');
-
-    // Get the regular status filters (excluding 'gerrit' and 'local')
-    final regularStatuses = filters.statuses!
-        .map((s) => CliOptions.statusMapping[s.toLowerCase()] ?? s)
+    final lowerStatuses = filters.statuses!
+        .map((s) => s.toLowerCase())
         .toList();
 
-    // Build the combined status list
-    final displayStatuses = <String>[];
+    // Check if 'gerrit' is in the statuses
+    final hasGerrit = lowerStatuses.contains(CliOptions.gerritStatusValue);
 
-    if (hasGerrit) {
-      // Add all Gerrit statuses
-      displayStatuses.addAll(CliOptions.allGerritStatuses);
-    }
+    // Check if 'local' is in the statuses
+    final hasLocal = lowerStatuses.contains(CliOptions.localStatusValue);
 
-    // Add regular statuses (if not already included via 'gerrit')
-    for (final status in regularStatuses) {
-      if (!displayStatuses.contains(status)) {
-        displayStatuses.add(status);
-      }
-    }
+    // The statuses being selected. The special values resolve to no
+    // BranchStatus and are handled separately above, so they drop out here.
+    final selectedStatuses = <BranchStatus>{
+      if (hasGerrit) ...BranchStatus.gerritStatuses,
+      for (final value in lowerStatuses) ?BranchStatus.fromCliValue(value),
+    };
 
     filtered = filtered.where((branch) {
       // Handle 'local' status (branches without Gerrit config)
@@ -117,14 +109,11 @@ List<BranchInfo> applyFilters(
         return true;
       }
 
-      // Handle regular Gerrit statuses
-      if (displayStatuses.isNotEmpty && hasGerritConfig) {
-        final status = branch.getDisplayStatus();
-        // Check if status starts with any of the display statuses
-        // This handles cases like "Active (LGTM +1)" matching "Active"
-        return displayStatuses.any(
-          (s) => status.toLowerCase().startsWith(s.toLowerCase()),
-        );
+      // Handle regular Gerrit statuses. A branch whose change has not been
+      // fetched reports BranchStatus.none, and one Gerrit describes in terms
+      // this tool does not model reports null; neither is selectable.
+      if (selectedStatuses.isNotEmpty && hasGerritConfig) {
+        return selectedStatuses.contains(branch.branchStatus);
       }
 
       return false;

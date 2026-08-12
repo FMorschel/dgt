@@ -3,6 +3,8 @@ import 'dart:isolate';
 
 import 'package:http/http.dart' as http;
 
+import 'branch_status.dart';
+
 /// Represents the LGTM (Code-Review) status of a Gerrit change.
 class LgtmStatus {
   LgtmStatus({
@@ -240,101 +242,134 @@ class GerritChange {
     return null; // No relevant messages found
   }
 
-  /// Maps the Gerrit change to a user-friendly status string.
+  /// The state this change is in.
   ///
   /// Priority order (when multiple conditions match):
   /// 1. Merged (highest priority)
   /// 2. Abandoned
   /// 3. Merge conflict
-  ///    a. Merge conflict (WIP)
-  ///    b. Merge conflict (LGTM +n)
-  ///    c. Merge conflict (Unsent)
-  ///    d. Merge conflict
   /// 4. WIP
   /// 5. Active (NEW status and not WIP)
-  ///    a. Commit (CQ+2)
-  ///    b. Unsent (nobody but the owner on the reviewer list)
-  ///    c. LGTM + Waiting for reviewers
-  ///    d. LGTM + Waiting for owner reply
-  ///    e. LGTM (approved)
-  ///    f. Waiting for reviewers
-  ///    g. Waiting for owner reply (Reply)
-  String getUserFriendlyStatus() {
+  ///
+  /// Returns null when Gerrit reports a [status] this tool does not model;
+  /// [getUserFriendlyStatus] shows the raw value in that case.
+  BranchStatus? get branchStatus {
     // Priority 1: Merged
     if (status == 'MERGED') {
-      return 'Merged';
+      return .merged;
     }
 
     // Priority 2: Abandoned
     if (status == 'ABANDONED') {
-      return 'Abandoned';
+      return .abandoned;
     }
 
     // Priority 3: Merge conflict
     if (!mergeable) {
-      if (workInProgress) {
-        return 'Merge conflict (WIP)';
-      } else if (lgtm.approved) {
-        return 'Merge conflict (LGTM $lgtm)';
-      } else if (unsent) {
-        return 'Merge conflict (Unsent)';
-      }
-      return 'Merge conflict';
+      return .mergeConflict;
     }
 
     // Priority 4: WIP
     if (workInProgress) {
-      return 'WIP';
+      return .wip;
     }
 
     // Priority 5: Active (NEW status and not WIP)
     if (status == 'NEW') {
-      // 5a. Commit (CQ+2)
-      if (commitQueueStatus == 2) {
-        return 'Active (Commit)';
-      }
-
-      // 5b. Unsent. Checked before the message history because uploading a
-      // patch set posts a message authored by the owner, which would
-      // otherwise report every freshly uploaded change as waiting for
-      // reviewers that were never added.
-      if (unsent) {
-        return 'Active (Unsent)';
-      }
-
-      // 5c-5g: Check message history for waiting/reply status
-      final waitingStatus = _isWaitingForReviewers();
-
-      if (lgtm.approved) {
-        // 5c. LGTM + Waiting
-        if (waitingStatus ?? false) {
-          return 'Active (LGTM $lgtm, Waiting)';
-        }
-        // 5d. LGTM + Reply
-        else if (waitingStatus == false) {
-          return 'Active (LGTM $lgtm, Reply)';
-        }
-        // 5e. LGTM only
-        else {
-          return 'Active (LGTM $lgtm)';
-        }
-      }
-
-      // 5f. Waiting (no LGTM)
-      if (waitingStatus ?? false) {
-        return 'Active (Waiting)';
-      }
-
-      // 5g. Reply (no LGTM)
-      if (waitingStatus == false) {
-        return 'Active (Reply)';
-      }
-
-      return 'Active';
+      return .active;
     }
 
-    // Fallback for other statuses
-    return status;
+    return null;
+  }
+
+  /// Describes a merge conflict, qualified by whatever else is true of it.
+  ///
+  /// a. Merge conflict (WIP)
+  /// b. Merge conflict (LGTM +n)
+  /// c. Merge conflict (Unsent)
+  /// d. Merge conflict
+  String _mergeConflictDetail() {
+    if (workInProgress) {
+      return 'Merge conflict (WIP)';
+    } else if (lgtm.approved) {
+      return 'Merge conflict (LGTM $lgtm)';
+    } else if (unsent) {
+      return 'Merge conflict (Unsent)';
+    }
+    return 'Merge conflict';
+  }
+
+  /// Describes an open change, qualified by how far along review is.
+  ///
+  /// a. Commit (CQ+2)
+  /// b. Unsent (nobody but the owner on the reviewer list)
+  /// c. LGTM + Waiting for reviewers
+  /// d. LGTM + Waiting for owner reply
+  /// e. LGTM (approved)
+  /// f. Waiting for reviewers
+  /// g. Waiting for owner reply (Reply)
+  String _activeDetail() {
+    // 5a. Commit (CQ+2)
+    if (commitQueueStatus == 2) {
+      return 'Active (Commit)';
+    }
+
+    // 5b. Unsent. Checked before the message history because uploading a
+    // patch set posts a message authored by the owner, which would
+    // otherwise report every freshly uploaded change as waiting for
+    // reviewers that were never added.
+    if (unsent) {
+      return 'Active (Unsent)';
+    }
+
+    // 5c-5g: Check message history for waiting/reply status
+    final waitingStatus = _isWaitingForReviewers();
+
+    if (lgtm.approved) {
+      // 5c. LGTM + Waiting
+      if (waitingStatus ?? false) {
+        return 'Active (LGTM $lgtm, Waiting)';
+      }
+      // 5d. LGTM + Reply
+      else if (waitingStatus == false) {
+        return 'Active (LGTM $lgtm, Reply)';
+      }
+      // 5e. LGTM only
+      else {
+        return 'Active (LGTM $lgtm)';
+      }
+    }
+
+    // 5f. Waiting (no LGTM)
+    if (waitingStatus ?? false) {
+      return 'Active (Waiting)';
+    }
+
+    // 5g. Reply (no LGTM)
+    if (waitingStatus == false) {
+      return 'Active (Reply)';
+    }
+
+    return 'Active';
+  }
+
+  /// Maps the Gerrit change to a user-friendly status string.
+  ///
+  /// This is [branchStatus] plus the detail worth showing for it, e.g.
+  /// `Active (LGTM +1, Waiting)`. Only the display layer should depend on the
+  /// exact wording; anything deciding *about* a change should read
+  /// [branchStatus].
+  String getUserFriendlyStatus() {
+    final currentStatus = branchStatus;
+
+    return switch (currentStatus) {
+      BranchStatus.mergeConflict => _mergeConflictDetail(),
+      BranchStatus.active => _activeDetail(),
+      // Merged, WIP, abandoned: nothing worth adding to the name itself.
+      final BranchStatus plain => plain.displayPrefix,
+      // Fallback for statuses this tool does not model.
+      null => status,
+    };
   }
 }
 

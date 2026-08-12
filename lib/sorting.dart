@@ -1,4 +1,5 @@
 import 'branch_info.dart';
+import 'branch_status.dart';
 import 'cli_options.dart';
 
 /// Options for sorting branches.
@@ -51,6 +52,12 @@ void validateSortDirection(String direction) {
     );
   }
 }
+
+/// Returns the sort priority of a status; lower sorts first.
+///
+/// Statuses [BranchStatus] does not model sort last.
+int _getStatusPriority(BranchStatus? status) =>
+    status?.sortPriority ?? BranchStatus.values.length;
 
 /// Computes a divergence score for sorting.
 ///
@@ -119,20 +126,9 @@ List<BranchInfo> applySort(List<BranchInfo> branches, SortOptions sortOptions) {
       });
 
     case 'status':
-      // Define status priority for sorting
-      const statusPriority = {
-        'Merge conflict': 0,
-        'WIP': 1,
-        'Active': 2,
-        'Merged': 3,
-        '-': 4, // Branches without Gerrit status
-      };
-
       sorted.sort((a, b) {
-        final statusA = a.getDisplayStatus();
-        final statusB = b.getDisplayStatus();
-        final priorityA = statusPriority[statusA] ?? 99;
-        final priorityB = statusPriority[statusB] ?? 99;
+        final priorityA = _getStatusPriority(a.branchStatus);
+        final priorityB = _getStatusPriority(b.branchStatus);
         return multiplier * priorityA.compareTo(priorityB);
       });
 

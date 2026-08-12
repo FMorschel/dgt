@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'branch_info.dart';
+import 'branch_status.dart';
 import 'display_options.dart';
 import 'performance_tracker.dart';
 import 'terminal.dart';
@@ -215,7 +216,7 @@ class OutputFormatter {
       gerritHash,
       gerritDate,
       gerritUrl,
-      status,
+      branchInfo.branchStatus,
       hasLocalChanges,
       hasRemoteChanges,
     );
@@ -246,7 +247,7 @@ class OutputFormatter {
     String? gerritHash,
     String? gerritDate,
     String? gerritUrl,
-    String status,
+    BranchStatus? status,
     bool hasLocalChanges,
     bool hasRemoteChanges,
   ) {
@@ -315,21 +316,18 @@ class OutputFormatter {
   }
 
   /// Gets the color text function for a status.
-  String Function(String) _getStatusColorTextFunction(String status) {
-    switch (status) {
-      case String(:var startsWith) when startsWith('Active'):
-        return Terminal.greenText;
-      case 'WIP':
-        return Terminal.yellowText;
-      case String(:var startsWith) when startsWith('Merge '):
-        return Terminal.redText;
-      case 'Merged':
-        return Terminal.cyanText;
-      case 'Abandoned':
-        return Terminal.grayText;
-      default:
-        return (String text) => text; // No color for default
-    }
+  String Function(String text) _getStatusColorTextFunction(
+    BranchStatus? status,
+  ) {
+    return switch (status) {
+      .active => Terminal.greenText,
+      .wip => Terminal.yellowText,
+      .mergeConflict => Terminal.redText,
+      .merged => Terminal.cyanText,
+      .abandoned => Terminal.grayText,
+      // Branches with no change, and statuses this tool does not model.
+      .none || null => (text) => text,
+    };
   }
 
   /// Pads a string to the specified width.
