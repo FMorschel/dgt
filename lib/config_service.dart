@@ -309,8 +309,20 @@ extension DgtConfigExtensions on DgtConfig? {
 
 /// Service for reading and managing the dgt configuration file
 class ConfigService {
+  /// Overrides the location of the config file.
+  ///
+  /// [Platform.environment] cannot be modified at runtime, so this is the seam
+  /// tests use to point the service at a temporary directory instead of the
+  /// real home directory. Leave it null in production, where the path is
+  /// derived from the environment.
+  static String? configFilePathOverride;
+
   /// Get the path to the config file (~/.dgt/.config)
   static String getConfigFilePath() {
+    if (configFilePathOverride case final override?) {
+      return override;
+    }
+
     final home =
         Platform.environment['HOME'] ??
         Platform.environment['USERPROFILE'] ??
