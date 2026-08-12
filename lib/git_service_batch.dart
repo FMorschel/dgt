@@ -23,7 +23,7 @@ class GitServiceBatch {
       'for-each-ref',
       '--format=%(refname:short)|%(objectname)|%(committerdate:iso8601)',
       ...branches.map((b) => 'refs/heads/$b'),
-    ]);
+    ], workingDirectory: GitService.workingDirectory);
 
     if (result.exitCode != 0) {
       throw ProcessException(
@@ -73,7 +73,7 @@ class GitServiceBatch {
         'config',
         '--get-regexp',
         '^branch\\..*\\.(gerrit|last-upload-hash)',
-      ]);
+      ], workingDirectory: GitService.workingDirectory);
 
       if (result.exitCode != 0) {
         // No gerrit config found

@@ -39,8 +39,18 @@ class GitService {
   /// Format: Change-Id: I[40 hex characters]
   static final RegExp _changeIdRegex = RegExp('Change-Id: (I[a-f0-9]{40})');
 
+  /// The directory Git commands run in.
+  ///
+  /// Null means the process' current directory, which is what `dgt` uses:
+  /// `--path` switches [Directory.current] at startup so that every child
+  /// process, including the ones `dgt clean` shells out to, sees the same
+  /// repository. Setting this instead targets a repository without disturbing
+  /// process-wide state, which is how the tests stay isolated.
+  static String? workingDirectory;
+
   /// Cache for Git command results to avoid redundant executions.
-  /// Key: concatenated command arguments (e.g., "rev-parse^main")
+  /// Key: working directory and concatenated command arguments
+  /// (e.g., "|rev-parse^main")
   /// Value: command output
   static final Map<String, String> _cache = <String, String>{};
 
@@ -53,8 +63,11 @@ class GitService {
   }
 
   /// Generates a cache key from Git command arguments.
+  ///
+  /// The directory is part of the key: the same command means different things
+  /// in different repositories.
   static String _getCacheKey(List<String> arguments) {
-    return arguments.join('^');
+    return '${workingDirectory ?? ''}|${arguments.join('^')}';
   }
 
   /// Executes a Git command and returns the output.
@@ -69,7 +82,11 @@ class GitService {
     }
 
     // Execute the Git command
-    final result = await Process.run('git', arguments);
+    final result = await Process.run(
+      'git',
+      arguments,
+      workingDirectory: workingDirectory,
+    );
 
     if (result.exitCode != 0) {
       throw ProcessException(
