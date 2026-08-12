@@ -45,6 +45,7 @@ dgt list [options]
 --gerrit / --no-gerrit     Show or hide Gerrit columns (hash, date) [default: true]
 --local / --no-local       Show or hide local columns (hash, date) [default: true]
 --url                      Show Gerrit URL column [default: false]
+--dates <timezone>         Timezone for date columns: local, utc [default: local]
 ```
 
 #### Filter Options
@@ -119,6 +120,7 @@ All options from `dgt list` can be saved as defaults:
 --gerrit / --no-gerrit
 --local / --no-local
 --url
+--dates <timezone>
 
 # Filter options
 --status <status>
@@ -150,6 +152,24 @@ All options from `dgt list` can be saved as defaults:
 - **Format**: JSON
 - **Scope**: User-level (applies to all repositories)
 
+```json
+{
+  "local": true,
+  "gerrit": true,
+  "url": false,
+  "dates": "local",
+  "filterStatuses": ["active", "wip"],
+  "filterSince": "2025-01-01",
+  "filterBefore": "2025-12-31",
+  "filterDiverged": true,
+  "sortField": "local-date",
+  "sortDirection": "desc"
+}
+```
+
+Only the keys you have set are written; anything absent falls back to the
+built-in default.
+
 #### Examples
 
 ```bash
@@ -158,6 +178,9 @@ dgt config
 
 # Save display preferences
 dgt config --no-gerrit --url
+
+# Save a timezone for the date columns
+dgt config --dates utc
 
 # Save filter preferences
 dgt config --status active --status wip --diverged
@@ -224,7 +247,7 @@ dgt clean --dry-run --delete
 |-------|-------------|---------------|
 | `local-date` | Local commit date | Sorts by commit timestamp |
 | `gerrit-date` | Gerrit update date | Sorts by last Gerrit update |
-| `status` | Gerrit status | Sorts alphabetically by status |
+| `status` | Gerrit status | Sorts by urgency: merge conflict, WIP, active, merged, abandoned, then branches with no change |
 | `divergences` | Divergence state | Sorts by: both diverged, one side, in sync |
 | `name` | Branch name | Sorts alphabetically by branch name |
 
@@ -255,6 +278,29 @@ All date inputs use ISO 8601 format:
 dgt list --since 2025-10-01
 dgt list --before 2025-10-31T23:59:59
 dgt config --since 2025-01-01 --before 2025-12-31
+```
+
+### Date Display Timezone
+
+The `Local Date` and `Gerrit Date` columns show `yyyy-MM-dd HH:mm`. Both
+sources give absolute instants — git prints a UTC offset in its `%ci` format,
+and Gerrit documents its timestamps as UTC — so both columns are converted to
+the same timezone and can be compared directly.
+
+| Value   | Behavior                                   |
+|---------|--------------------------------------------|
+| `local` | The machine's local timezone. The default. |
+| `utc`   | Coordinated Universal Time.                |
+
+```bash
+# Show this run in UTC
+dgt list --dates utc
+
+# Make UTC the default for every run
+dgt config --dates utc
+
+# Go back to local time
+dgt config clean --dates
 ```
 
 ## Output Format

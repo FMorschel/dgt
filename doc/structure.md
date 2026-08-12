@@ -12,10 +12,12 @@ dgt/
 │   └── dgt.dart              # Main entry point and CLI command handling
 ├── lib/
 │   ├── branch_info.dart      # Branch information data model
+│   ├── branch_status.dart    # Branch status enum: display text, sort order, CLI values
 │   ├── clean_command.dart    # Git clean/archive command wrapper
 │   ├── cli_options.dart      # CLI option definitions and metadata
 │   ├── config_command.dart   # Configuration command handling
 │   ├── config_service.dart   # Configuration file management
+│   ├── date_display.dart     # Date column timezone enum (local/utc)
 │   ├── display_options.dart  # Display configuration model
 │   ├── error_validation.dart # Input validation and error handling
 │   ├── filtering.dart        # Branch filtering logic
@@ -30,6 +32,7 @@ dgt/
 │   ├── terminal.dart         # Terminal output utilities
 │   └── verbose_output.dart   # Verbose logging system
 ├── doc/                      # Documentation files
+├── test/                     # Unit tests (see doc/tmp-testing.md)
 ├── analysis_options.yaml     # Dart analysis configuration
 ├── pubspec.yaml             # Dart package configuration
 └── README.md               # User-facing documentation
@@ -76,9 +79,18 @@ The DGT tool follows a modular architecture with clear separation of concerns:
 
 **Key Methods**:
 
+- `branchStatus`: The state the branch is in, as a `BranchStatus`
 - `getDisplayStatus()`: User-friendly status string
 - `hasLocalChanges()`: Detects uncommitted local changes
 - `hasRemoteChanges()`: Detects Gerrit updates not pulled locally
+
+**Status vs. displayed text**: `BranchStatus` (`lib/branch_status.dart`) is the
+value code decides on — filtering, sorting and colour selection all read
+`branchStatus`. `getDisplayStatus()` derives the *text* from it and adds the
+detail worth showing (`Active (LGTM +1, Waiting)`), which nothing parses back.
+`branchStatus` is `BranchStatus.none` for a branch with no Gerrit change, and
+null when Gerrit reports a status this tool does not model — in that case the
+raw Gerrit value is displayed verbatim.
 
 ##### GerritChange (`lib/gerrit_service.dart`)
 
@@ -178,6 +190,11 @@ The DGT tool follows a modular architecture with clear separation of concerns:
 - `applySort()`: Sorts branches by specified criteria
 - `validateSortField()`/`validateSortDirection()`: Input validation
 
+**Status Order**: `status` sorts by `BranchStatus.sortPriority` — merge
+conflict, WIP, active, merged, abandoned, then branches with no Gerrit change.
+It reads `BranchInfo.branchStatus`, not the displayed text, so the detail in
+`Active (LGTM +1)` has no effect on where a branch sorts.
+
 #### 5. Configuration Management
 
 ##### ConfigService (`lib/config_service.dart`)
@@ -199,6 +216,7 @@ The DGT tool follows a modular architecture with clear separation of concerns:
 **Configuration Options**:
 
 - Display preferences (column visibility)
+- Date column timezone (`dates`: local or utc)
 - Filter defaults (status, date ranges, divergence)
 - Sort preferences (field and direction)
 
@@ -211,6 +229,7 @@ The DGT tool follows a modular architecture with clear separation of concerns:
 **Features**:
 
 - Dynamic column width calculation
+- Timezone-aware date columns (both sources normalised to one clock)
 - Color coding for status and divergence
 - Difference highlighting (yellow for mismatches)
 - Performance summary display

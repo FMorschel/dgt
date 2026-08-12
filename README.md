@@ -138,6 +138,19 @@ Save URL column as a default in your config:
 dart pub global run dgt config --url
 ```
 
+### Choose the date timezone
+
+Date columns show local time by default. Both the local and Gerrit columns use
+the same timezone, so they can be compared directly:
+
+```bash
+# Show dates in UTC for this run
+dart pub global run dgt --dates utc
+
+# Save UTC as the default
+dart pub global run dgt config --dates utc
+```
+
 ### Specify Repository Path
 
 Analyze a repository in a different directory:
@@ -274,9 +287,11 @@ Typical execution time: **< 3 seconds** for repositories with dozens of branches
 
 For more detailed information, see:
 
-- **[Gerrit API Documentation](doc/gerrit_api.md)** - Detailed information about Gerrit REST API endpoints, request/response formats, XSSI protection, and batch query optimization
-- **[Git Config Documentation](doc/git_config.md)** - Explanation of how Gerrit metadata is stored in `.git/config` and how DGT uses it
-- **[Implementation Plan](doc/plan.md)** - Complete implementation roadmap and technical details
+- **[CLI Reference](doc/cli-reference.md)** - Every command, option and allowed value
+- **[Features](doc/features.md)** - What each feature does, with examples
+- **[Implementation](doc/implementation.md)** - Gerrit REST API usage, XSSI protection, batch query optimization and how Gerrit metadata is read from `.git/config`
+- **[Project Structure](doc/structure.md)** - Architecture and module responsibilities
+- **[Testing](doc/tmp-testing.md)** - How the test suite is organised and how to add to it
 - **[Product Requirements](doc/prd.md)** - Original product requirements and design decisions
 
 ## Configuration
@@ -288,7 +303,7 @@ The tool automatically reads your local Git configuration to extract:
 - **Change-IDs**: Extracted from commit messages as a fallback (format: `Change-Id: I[40 hex chars]`)
 - **Patchset Information**: Current patchset number and upload hashes
 
-See the [Git Config Documentation](doc/git_config.md) for full details on the configuration format.
+See the [Implementation](doc/implementation.md) documentation for full details on the configuration format.
 
 ## Contributing
 

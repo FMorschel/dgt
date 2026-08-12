@@ -64,6 +64,20 @@ dgt --gerrit --local
 dgt --url
 ```
 
+#### Date Timezone
+
+Date columns show `yyyy-MM-dd HH:mm`. Git and Gerrit both report absolute
+instants, so both columns are converted to the same timezone and can be
+compared directly.
+
+```bash
+# Local time (default)
+dgt --dates local
+
+# UTC
+dgt --dates utc
+```
+
 #### Verbose Output
 
 ```bash
@@ -213,9 +227,14 @@ dgt --sort name
 
 - `local-date` - Local commit date
 - `gerrit-date` - Gerrit update date
-- `status` - Gerrit status
+- `status` - Gerrit status, by urgency (see below)
 - `divergences` - Divergence state (both sides, one side, in sync)
 - `name` - Branch name
+
+Ascending `--sort status` orders by how soon a branch needs attention: merge
+conflict, WIP, active, merged, abandoned, then branches with no Gerrit change.
+Detail in a status does not change its position, so `Active (LGTM +1)` sorts
+with the other active branches.
 
 #### Sort Directions
 
@@ -261,6 +280,7 @@ Save default preferences to avoid repeating command-line options.
 dgt config --no-gerrit          # Hide Gerrit columns by default
 dgt config --url                # Show URL column by default
 dgt config --gerrit --local     # Show all columns (reset)
+dgt config --dates utc          # Show dates in UTC by default
 
 # Save filter preferences
 dgt config --status active      # Default to Active branches only
