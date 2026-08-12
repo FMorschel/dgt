@@ -234,7 +234,7 @@ class GitService {
       final output = await _runGitCommand(<String>[
         'config',
         '--get-regexp',
-        '^branch\\.$branch\\.gerrit',
+        '^branch\\.${RegExp.escape(branch)}\\.(gerrit|last-upload-hash)',
       ]);
 
       // Parse the output to extract Gerrit config values
@@ -246,11 +246,12 @@ class GitService {
         if (parts.length < 2) continue;
 
         // Extract the key name (e.g., "gerritissue" from
-        // "branch.main.gerritissue")
+        // "branch.main.gerritissue"). The branch name may contain dots, so the
+        // key is always the last segment rather than the third one.
         final keyParts = parts[0].split('.');
         if (keyParts.length < 3) continue;
 
-        final configKey = keyParts[2]; // e.g., "gerritissue"
+        final configKey = keyParts.last; // e.g., "gerritissue"
         final configValue = parts
             .sublist(1)
             .join(' '); // Handle values with spaces

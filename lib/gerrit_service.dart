@@ -96,12 +96,22 @@ class GerritChange {
       }
     }
 
-    // Check if there are reviewers (unsent to reviewers)
+    // Extract owner ID
+    final owner = json['owner'] as Map<String, dynamic>?;
+    final ownerId = owner?['_account_id'] as int?;
+
+    // Check whether the change has been sent out for review. Gerrit lists the
+    // owner in REVIEWER too, so a non-empty list is not enough: the change is
+    // only sent once somebody other than the owner is on it.
     var unsent = false;
     final reviewers = json['reviewers'] as Map<String, dynamic>?;
     if (reviewers != null) {
-      final reviewerList = reviewers['REVIEWER'] as List<dynamic>?;
-      unsent = reviewerList != null && reviewerList.isNotEmpty;
+      final reviewerList = reviewers['REVIEWER'] as List<dynamic>? ?? const [];
+      unsent = !reviewerList.any((reviewer) {
+        if (reviewer is! Map<String, dynamic>) return false;
+        final accountId = reviewer['_account_id'] as int?;
+        return accountId != null && accountId != ownerId;
+      });
     }
 
     // Extract Commit-Queue status
@@ -142,10 +152,6 @@ class GerritChange {
       return dateA.compareTo(dateB);
     });
 
-    // Extract owner ID
-    final owner = json['owner'] as Map<String, dynamic>?;
-    final ownerId = owner?['_account_id'] as int?;
-
     return GerritChange(
       changeId: json['change_id'] as String,
       status: json['status'] as String,
@@ -182,7 +188,8 @@ class GerritChange {
   /// Code-Review status including approval and vote counts
   final LgtmStatus lgtm;
 
-  /// Whether the change has been sent to reviewers (has REVIEWER list)
+  /// Whether the change has yet to be sent to reviewers, meaning nobody other
+  /// than the owner is on the REVIEWER list.
   final bool unsent;
 
   /// Maximum Commit-Queue vote value (0, 1, or 2)
@@ -246,12 +253,12 @@ class GerritChange {
   /// 4. WIP
   /// 5. Active (NEW status and not WIP)
   ///    a. Commit (CQ+2)
-  ///    b. LGTM + Waiting for reviewers
-  ///    c. LGTM + Waiting for owner reply
-  ///    d. LGTM (approved)
-  ///    e. Waiting for reviewers
-  ///    f. Waiting for owner reply (Reply)
-  ///    g. Unsent
+  ///    b. Unsent (nobody but the owner on the reviewer list)
+  ///    c. LGTM + Waiting for reviewers
+  ///    d. LGTM + Waiting for owner reply
+  ///    e. LGTM (approved)
+  ///    f. Waiting for reviewers
+  ///    g. Waiting for owner reply (Reply)
   String getUserFriendlyStatus() {
     // Priority 1: Merged
     if (status == 'MERGED') {
@@ -287,37 +294,40 @@ class GerritChange {
         return 'Active (Commit)';
       }
 
-      // 5b-5g: Check message history for waiting/reply status
+      // 5b. Unsent. Checked before the message history because uploading a
+      // patch set posts a message authored by the owner, which would
+      // otherwise report every freshly uploaded change as waiting for
+      // reviewers that were never added.
+      if (unsent) {
+        return 'Active (Unsent)';
+      }
+
+      // 5c-5g: Check message history for waiting/reply status
       final waitingStatus = _isWaitingForReviewers();
 
       if (lgtm.approved) {
-        // 5b. LGTM + Waiting
+        // 5c. LGTM + Waiting
         if (waitingStatus ?? false) {
           return 'Active (LGTM $lgtm, Waiting)';
         }
-        // 5c. LGTM + Reply
+        // 5d. LGTM + Reply
         else if (waitingStatus == false) {
           return 'Active (LGTM $lgtm, Reply)';
         }
-        // 5d. LGTM only
+        // 5e. LGTM only
         else {
           return 'Active (LGTM $lgtm)';
         }
       }
 
-      // 5e. Waiting (no LGTM)
+      // 5f. Waiting (no LGTM)
       if (waitingStatus ?? false) {
         return 'Active (Waiting)';
       }
 
-      // 5f. Reply (no LGTM)
+      // 5g. Reply (no LGTM)
       if (waitingStatus == false) {
         return 'Active (Reply)';
-      }
-
-      // 5g. Unsent
-      if (unsent) {
-        return 'Active (Unsent)';
       }
 
       return 'Active';
@@ -421,20 +431,25 @@ class GerritService {
         }
 
         // Process the response - Gerrit returns an array where each element
-        // contains the results for one query (as an array with 0 or 1 items)
+        // contains the results for one query (as an array with 0 or 1 items).
+        // With a single `q=` parameter it instead returns a flat array of
+        // changes, so normalize that shape to the nested one first.
         if (jsonData is List) {
-          for (final queryResult in jsonData) {
-            if (queryResult is List && queryResult.isNotEmpty) {
-              // Each query returns an array with at most one change
-              final changeJson = queryResult[0] as Map<String, dynamic>;
-              final change = GerritChange.fromJson(changeJson);
+          final queryResults = jsonData.every((dynamic e) => e is List)
+              ? jsonData
+              : <dynamic>[jsonData];
+
+          for (final queryResult in queryResults) {
+            if (queryResult is! List) continue;
+            for (final changeJson in queryResult) {
+              if (changeJson is! Map<String, dynamic>) continue;
 
               // Match the change back to the issue number using the _number
               // field. This field contains the Gerrit change number (same as
               //issue number)
               final changeNumber = changeJson['_number']?.toString();
               if (changeNumber != null && results.containsKey(changeNumber)) {
-                results[changeNumber] = change;
+                results[changeNumber] = GerritChange.fromJson(changeJson);
               }
             }
           }

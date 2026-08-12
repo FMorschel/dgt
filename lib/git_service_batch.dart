@@ -91,12 +91,12 @@ class GitServiceBatch {
         if (parts.length < 2) continue;
 
         // Extract branch name and config key
-        // Format: branch.<name>.<key> <value>
+        // Format: branch.<name>.<key> <value>, where <name> may contain dots
         final keyParts = parts[0].split('.');
         if (keyParts.length < 3) continue;
 
-        final branchName = keyParts[1];
-        final configKey = keyParts[2];
+        final branchName = keyParts.sublist(1, keyParts.length - 1).join('.');
+        final configKey = keyParts.last;
         final configValue = parts.sublist(1).join(' ');
 
         configsByBranch.putIfAbsent(branchName, () => {})[configKey] =
