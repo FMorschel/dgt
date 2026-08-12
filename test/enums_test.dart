@@ -1,5 +1,6 @@
 import 'package:dgt/branch_status.dart';
 import 'package:dgt/cli_options.dart';
+import 'package:dgt/date_display.dart';
 import 'package:test/test.dart';
 
 void main() {
@@ -112,4 +113,37 @@ void main() {
     });
   });
 
+  group('DateDisplay', () {
+    test('defaults to local time', () {
+      expect(DateDisplay.defaultValue, DateDisplay.local);
+    });
+
+    test('maps CLI values back to modes, ignoring case', () {
+      expect(DateDisplay.fromCliValue('local'), DateDisplay.local);
+      expect(DateDisplay.fromCliValue('utc'), DateDisplay.utc);
+      expect(DateDisplay.fromCliValue('UTC'), DateDisplay.utc);
+    });
+
+    test('returns null for unknown and missing values', () {
+      expect(DateDisplay.fromCliValue('mars'), isNull);
+      expect(DateDisplay.fromCliValue(null), isNull);
+    });
+
+    test('converts an instant into the mode it names', () {
+      final instant = DateTime.utc(2025, 10, 7, 18, 30);
+
+      expect(DateDisplay.utc.apply(instant), instant);
+      expect(DateDisplay.utc.apply(instant).isUtc, isTrue);
+      expect(DateDisplay.local.apply(instant).isUtc, isFalse);
+      // Converting changes the wall clock, never the instant.
+      expect(DateDisplay.local.apply(instant).toUtc(), instant);
+    });
+
+    test('is exposed to the CLI with descriptions', () {
+      expect(CliOptions.allowedDateDisplays, ['local', 'utc']);
+      for (final value in CliOptions.allowedDateDisplays) {
+        expect(CliOptions.dateDisplayDescriptions[value], isNotEmpty);
+      }
+    });
+  });
 }

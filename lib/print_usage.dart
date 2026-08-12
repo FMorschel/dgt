@@ -52,6 +52,10 @@ void printUsage(ArgParser argParser) {
     '      --[no-]url       Show Gerrit URL column in the output (default: '
     'off)',
   );
+  Terminal.info(
+    '      --dates <tz>     Timezone for the date columns (local, utc; '
+    'default: local)',
+  );
   Terminal.info('');
   Terminal.info('  Filter options:');
   Terminal.info('      --status <status>    Filter branches by Gerrit status');
@@ -289,6 +293,10 @@ void printListHelp() {
     '  --[no-]url           Show Gerrit URL column in the output (default: '
     'off)',
   );
+  Terminal.info(
+    '  --dates <timezone>   Timezone for the date columns (local, utc; '
+    'default: local)',
+  );
   Terminal.info('');
   Terminal.info('Filter options:');
   Terminal.info('  --status <status>    Filter branches by Gerrit status');
@@ -370,6 +378,9 @@ void printConfigCommandHelp() {
     '  --[no-]local     Set default for displaying local hash and date columns',
   );
   Terminal.info('  --[no-]url       Set default for showing Gerrit URL column');
+  Terminal.info(
+    '  --dates <tz>     Set default timezone for date columns (local, utc)',
+  );
   Terminal.info('');
   Terminal.info('Filter options:');
   Terminal.info('  --status <status>    Set default status filters');

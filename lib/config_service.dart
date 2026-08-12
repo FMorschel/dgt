@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:args/args.dart';
 
 import 'cli_options.dart';
+import 'date_display.dart';
 import 'verbose_output.dart';
 
 /// Configuration options for the dgt tool
@@ -12,6 +13,7 @@ class DgtConfig {
     this.showLocal,
     this.showGerrit,
     this.showUrl,
+    this.dateDisplay,
     this.filterStatuses,
     this.filterSince,
     this.filterBefore,
@@ -25,6 +27,7 @@ class DgtConfig {
       showLocal: json['local'] as bool?,
       showGerrit: json['gerrit'] as bool?,
       showUrl: json['url'] as bool?,
+      dateDisplay: json['dates'] as String?,
       filterStatuses: (json['filterStatuses'] as List<dynamic>?)
           ?.map((e) => e as String)
           .toList(),
@@ -72,6 +75,7 @@ class DgtConfig {
       showGerrit: _extractFlag(results, 'gerrit'),
       showLocal: _extractFlag(results, 'local'),
       showUrl: _extractFlag(results, 'url'),
+      dateDisplay: _extractOption(results, 'dates'),
       filterStatuses: _extractMultiOption(results, 'status'),
       filterSince: _extractOption(results, 'since'),
       filterBefore: _extractOption(results, 'before'),
@@ -100,6 +104,10 @@ class DgtConfig {
   final bool? showLocal;
   final bool? showGerrit;
   final bool? showUrl;
+
+  /// The `--dates` value, as a [DateDisplay.cliValue].
+  final String? dateDisplay;
+
   final List<String>? filterStatuses;
   final String? filterSince;
   final String? filterBefore;
@@ -112,6 +120,7 @@ class DgtConfig {
       if (showLocal != null) 'local': showLocal,
       if (showGerrit != null) 'gerrit': showGerrit,
       if (showUrl != null) 'url': showUrl,
+      if (dateDisplay != null) 'dates': dateDisplay,
       if (filterStatuses != null && filterStatuses!.isNotEmpty)
         'filterStatuses': filterStatuses,
       if (filterSince != null) 'filterSince': filterSince,
@@ -245,6 +254,8 @@ extension DgtConfigExtensions on DgtConfig? {
         return this?.filterSince;
       case 'before':
         return this?.filterBefore;
+      case 'dates':
+        return this?.dateDisplay;
       default:
         return null;
     }
@@ -462,6 +473,9 @@ class ConfigService {
       if (config.showUrl != null) {
         print('  url:    ${config.showUrl}');
       }
+      if (config.dateDisplay != null) {
+        print('  dates:  ${config.dateDisplay}');
+      }
       if (config.filterStatuses != null && config.filterStatuses!.isNotEmpty) {
         print('  filterStatuses: ${config.filterStatuses}');
       }
@@ -580,6 +594,7 @@ class ConfigService {
                 showLocal: newConfig.showLocal,
                 showGerrit: newConfig.showGerrit,
                 showUrl: newConfig.showUrl,
+                dateDisplay: newConfig.dateDisplay,
                 filterStatuses: newStatuses,
                 filterSince: newConfig.filterSince,
                 filterBefore: newConfig.filterBefore,
@@ -595,6 +610,7 @@ class ConfigService {
                 showLocal: newConfig.showLocal,
                 showGerrit: newConfig.showGerrit,
                 showUrl: newConfig.showUrl,
+                dateDisplay: newConfig.dateDisplay,
                 filterStatuses: null, // Remove status filters
                 filterSince: newConfig.filterSince,
                 filterBefore: newConfig.filterBefore,
@@ -610,6 +626,7 @@ class ConfigService {
               showLocal: newConfig.showLocal,
               showGerrit: newConfig.showGerrit,
               showUrl: newConfig.showUrl,
+              dateDisplay: newConfig.dateDisplay,
               filterStatuses: newConfig.filterStatuses,
               filterSince: newConfig.filterSince,
               filterBefore: newConfig.filterBefore,
@@ -628,6 +645,7 @@ class ConfigService {
                   showLocal: newConfig.showLocal,
                   showGerrit: newConfig.showGerrit,
                   showUrl: newConfig.showUrl,
+                  dateDisplay: newConfig.dateDisplay,
                   filterStatuses: newConfig.filterStatuses,
                   filterSince: newConfig.filterSince,
                   filterBefore: newConfig.filterBefore,
@@ -646,6 +664,7 @@ class ConfigService {
                 showLocal: newConfig.showLocal,
                 showGerrit: newConfig.showGerrit,
                 showUrl: newConfig.showUrl,
+                dateDisplay: newConfig.dateDisplay,
                 filterStatuses: newConfig.filterStatuses,
                 filterSince: newConfig.filterSince,
                 filterBefore: newConfig.filterBefore,
@@ -661,6 +680,7 @@ class ConfigService {
               showLocal: null, // Remove local display setting
               showGerrit: newConfig.showGerrit,
               showUrl: newConfig.showUrl,
+              dateDisplay: newConfig.dateDisplay,
               filterStatuses: newConfig.filterStatuses,
               filterSince: newConfig.filterSince,
               filterBefore: newConfig.filterBefore,
@@ -675,6 +695,7 @@ class ConfigService {
               showLocal: newConfig.showLocal,
               showGerrit: null, // Remove gerrit display setting
               showUrl: newConfig.showUrl,
+              dateDisplay: newConfig.dateDisplay,
               filterStatuses: newConfig.filterStatuses,
               filterSince: newConfig.filterSince,
               filterBefore: newConfig.filterBefore,
@@ -689,6 +710,22 @@ class ConfigService {
               showLocal: newConfig.showLocal,
               showGerrit: newConfig.showGerrit,
               showUrl: null, // Remove url display setting
+              dateDisplay: newConfig.dateDisplay,
+              filterStatuses: newConfig.filterStatuses,
+              filterSince: newConfig.filterSince,
+              filterBefore: newConfig.filterBefore,
+              filterDiverged: newConfig.filterDiverged,
+              sortField: newConfig.sortField,
+              sortDirection: newConfig.sortDirection,
+            );
+          }(),
+          RemovableConfigOption.dates => () {
+            removedItems.add('dates');
+            return DgtConfig(
+              showLocal: newConfig.showLocal,
+              showGerrit: newConfig.showGerrit,
+              showUrl: newConfig.showUrl,
+              dateDisplay: null, // Remove date timezone setting
               filterStatuses: newConfig.filterStatuses,
               filterSince: newConfig.filterSince,
               filterBefore: newConfig.filterBefore,
@@ -703,6 +740,7 @@ class ConfigService {
               showLocal: newConfig.showLocal,
               showGerrit: newConfig.showGerrit,
               showUrl: newConfig.showUrl,
+              dateDisplay: newConfig.dateDisplay,
               filterStatuses: newConfig.filterStatuses,
               filterSince: null, // Remove since filter
               filterBefore: newConfig.filterBefore,
@@ -717,6 +755,7 @@ class ConfigService {
               showLocal: newConfig.showLocal,
               showGerrit: newConfig.showGerrit,
               showUrl: newConfig.showUrl,
+              dateDisplay: newConfig.dateDisplay,
               filterStatuses: newConfig.filterStatuses,
               filterSince: newConfig.filterSince,
               filterBefore: null, // Remove before filter

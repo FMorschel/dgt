@@ -1,6 +1,7 @@
 import 'package:args/args.dart';
 
 import 'config_service.dart';
+import 'date_display.dart';
 
 /// Configuration options for controlling what information to display in the
 /// branch table output.
@@ -20,6 +21,7 @@ class DisplayOptions {
     this.showLocal = true,
     this.showTiming = false,
     this.showUrl = false,
+    this.dateDisplay = DateDisplay.defaultValue,
   });
 
   /// Creates a DisplayOptions instance by resolving values from CLI arguments,
@@ -40,6 +42,11 @@ class DisplayOptions {
       showLocal: config.resolveFlag(results, 'local', true),
       showTiming: showTiming,
       showUrl: config.resolveFlag(results, 'url', false),
+      dateDisplay:
+          DateDisplay.fromCliValue(
+            config.resolveOption<String?>(results, 'dates', null),
+          ) ??
+          DateDisplay.defaultValue,
     );
   }
 
@@ -55,18 +62,23 @@ class DisplayOptions {
   /// Whether to display the Gerrit URL column.
   final bool showUrl;
 
+  /// The timezone the date columns are rendered in.
+  final DateDisplay dateDisplay;
+
   /// Creates a copy of this DisplayOptions with the specified fields replaced.
   DisplayOptions copyWith({
     bool? showGerrit,
     bool? showLocal,
     bool? showTiming,
     bool? showUrl,
+    DateDisplay? dateDisplay,
   }) {
     return DisplayOptions(
       showGerrit: showGerrit ?? this.showGerrit,
       showLocal: showLocal ?? this.showLocal,
       showTiming: showTiming ?? this.showTiming,
       showUrl: showUrl ?? this.showUrl,
+      dateDisplay: dateDisplay ?? this.dateDisplay,
     );
   }
 
@@ -76,7 +88,8 @@ class DisplayOptions {
         'showGerrit: $showGerrit, '
         'showLocal: $showLocal, '
         'showTiming: $showTiming, '
-        'showUrl: $showUrl'
+        'showUrl: $showUrl, '
+        'dateDisplay: ${dateDisplay.cliValue}'
         ')';
   }
 
@@ -88,11 +101,12 @@ class DisplayOptions {
         other.showGerrit == showGerrit &&
         other.showLocal == showLocal &&
         other.showTiming == showTiming &&
-        other.showUrl == showUrl;
+        other.showUrl == showUrl &&
+        other.dateDisplay == dateDisplay;
   }
 
   @override
   int get hashCode {
-    return Object.hash(showGerrit, showLocal, showTiming, showUrl);
+    return Object.hash(showGerrit, showLocal, showTiming, showUrl, dateDisplay);
   }
 }

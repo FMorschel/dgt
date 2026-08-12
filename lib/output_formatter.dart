@@ -348,15 +348,40 @@ class OutputFormatter {
     return hash.substring(0, 8);
   }
 
+  /// Matches a trailing zone designator, e.g. "Z", "-0400" or "+02:00".
+  static final RegExp _zoneSuffix = RegExp(r'(?:Z|[+-]\d{2}:?\d{2})$');
+
+  /// Matches the whitespace git leaves between the time and its UTC offset.
+  static final RegExp _spaceBeforeZone = RegExp(r'\s+([+-]\d{2}:?\d{2})$');
+
+  /// Parses a timestamp from either source into an absolute instant.
+  ///
+  /// The two sources spell the zone differently:
+  /// - Git `%ci`: "2025-10-07 14:30:45 -0400" — an explicit offset, separated
+  ///   by a space that [DateTime.parse] does not accept.
+  /// - Gerrit: "2025-10-07 14:30:45.000000000" — no designator at all. The
+  ///   Gerrit REST API documents its timestamps as UTC, so a bare string is
+  ///   read as UTC rather than as local time.
+  ///
+  /// Returns null when the string is not a timestamp at all.
+  DateTime? _parseTimestamp(String dateStr) {
+    final normalized = dateStr.trim().replaceFirstMapped(
+      _spaceBeforeZone,
+      (match) => match.group(1)!,
+    );
+
+    if (_zoneSuffix.hasMatch(normalized)) {
+      return DateTime.tryParse(normalized);
+    }
+    return DateTime.tryParse('${normalized}Z');
+  }
+
   /// Formats a date string to a consistent format.
   ///
-  /// Handles date strings from both Git and Gerrit, which use different
-  /// formats:
-  /// - Git format: "2025-10-07 14:30:45 -0400" (includes timezone offset)
-  /// - Gerrit format: "2025-10-07 14:30:45.000000000" (includes microseconds)
-  ///
-  /// Both are converted to the simplified format: "yyyy-MM-dd HH:mm"
-  /// This provides a consistent, readable display format regardless of source.
+  /// Timestamps from Git and Gerrit are both absolute instants (see
+  /// [_parseTimestamp]), so they are converted into the timezone named by
+  /// [DisplayOptions.dateDisplay] and rendered as "yyyy-MM-dd HH:mm". Both
+  /// date columns therefore refer to the same clock.
   ///
   /// [dateStr] - The date string to format
   /// Returns the formatted date string or "-" if the input is "-".
@@ -366,46 +391,18 @@ class OutputFormatter {
       return '-';
     }
 
-    try {
-      // Git format: "2025-10-07 14:30:45 -0400"
-      // Gerrit format: "2025-10-07 14:30:45.000000000" or ISO 8601
-
-      // Try to parse the date
-      DateTime? dateTime;
-
-      // Try parsing as ISO 8601 first (Gerrit format)
-      try {
-        dateTime = DateTime.parse(dateStr);
-      } catch (e) {
-        // If that fails, try to extract just the date/time part (Git format)
-        final parts = dateStr.split(' ');
-        if (parts.length >= 2) {
-          final datePart = parts[0];
-          final timePart = parts[1].split(
-            '.',
-          )[0]; // Remove microseconds if present
-          dateTime = DateTime.parse('$datePart $timePart');
-        }
-      }
-
-      if (dateTime != null) {
-        // Format as "yyyy-MM-dd HH:mm"
-        final year = dateTime.year.toString();
-        final month = dateTime.month.toString().padLeft(2, '0');
-        final day = dateTime.day.toString().padLeft(2, '0');
-        final hour = dateTime.hour.toString().padLeft(2, '0');
-        final minute = dateTime.minute.toString().padLeft(2, '0');
-        return '$year-$month-$day $hour:$minute';
-      }
-    } catch (e) {
-      // If parsing fails, return the original string truncated to fit column
-      // width
-      if (dateStr.length > 16) {
-        return dateStr.substring(0, 16);
-      }
+    final timestamp = _parseTimestamp(dateStr);
+    if (timestamp == null) {
+      // Not a timestamp; show what we were given, trimmed to the column.
+      return dateStr.length > 16 ? dateStr.substring(0, 16) : dateStr;
     }
 
-    return dateStr;
+    final shown = displayOptions.dateDisplay.apply(timestamp);
+    final month = shown.month.toString().padLeft(2, '0');
+    final day = shown.day.toString().padLeft(2, '0');
+    final hour = shown.hour.toString().padLeft(2, '0');
+    final minute = shown.minute.toString().padLeft(2, '0');
+    return '${shown.year}-$month-$day $hour:$minute';
   }
 
   /// Displays a performance summary showing timing breakdown of operations.

@@ -1,6 +1,7 @@
 import 'package:args/args.dart';
 
 import 'branch_status.dart';
+import 'date_display.dart';
 
 /// Metadata for CLI options used across the application.
 /// This centralizes option definitions so they can be reused for:
@@ -12,6 +13,7 @@ class CliOptions {
   static const String gerrit = 'gerrit';
   static const String local = 'local';
   static const String url = 'url';
+  static const String dates = 'dates';
 
   // Filter option names
   static const String status = 'status';
@@ -70,6 +72,17 @@ class CliOptions {
     localStatusValue: 'Branches without Gerrit configuration',
   };
 
+  /// Allowed values for the `--dates` option.
+  static final List<String> allowedDateDisplays = [
+    for (final display in DateDisplay.values) display.cliValue,
+  ];
+
+  /// Human-readable descriptions for `--dates` values.
+  static final Map<String, String> dateDisplayDescriptions = {
+    for (final display in DateDisplay.values)
+      display.cliValue: display.description,
+  };
+
   /// Allowed sort field values.
   static const List<String> allowedSortFields = [
     'local-date',
@@ -110,6 +123,14 @@ class CliOptions {
         defaultsTo: false,
         negatable: allowNegated,
         help: 'Show Gerrit URL column in the output.',
+      )
+      ..addOption(
+        dates,
+        help:
+            'Timezone for the date columns. '
+            'Allowed: ${allowedDateDisplays.join(", ")}',
+        allowed: allowedDateDisplays,
+        valueHelp: 'timezone',
       );
 
     // Filter options
@@ -276,6 +297,7 @@ enum RemovableConfigOption {
   local,
   gerrit,
   url,
+  dates,
   since,
   before;
 
@@ -283,27 +305,29 @@ enum RemovableConfigOption {
   /// Returns null if the option name is not valid
   static RemovableConfigOption? fromString(String optionName) {
     return switch (optionName) {
-      'status' => RemovableConfigOption.status,
-      'diverged' => RemovableConfigOption.diverged,
-      'sort' => RemovableConfigOption.sort,
-      'local' => RemovableConfigOption.local,
-      'gerrit' => RemovableConfigOption.gerrit,
-      'url' => RemovableConfigOption.url,
-      'since' => RemovableConfigOption.since,
-      'before' => RemovableConfigOption.before,
+      'status' => .status,
+      'diverged' => .diverged,
+      'sort' => .sort,
+      'local' => .local,
+      'gerrit' => .gerrit,
+      'url' => .url,
+      'dates' => .dates,
+      'since' => .since,
+      'before' => .before,
       _ => null,
     };
   }
 
   /// Display name for this option
   String get displayName => switch (this) {
-    RemovableConfigOption.status => 'status',
-    RemovableConfigOption.diverged => 'diverged',
-    RemovableConfigOption.sort => 'sort',
-    RemovableConfigOption.local => 'local',
-    RemovableConfigOption.gerrit => 'gerrit',
-    RemovableConfigOption.url => 'url',
-    RemovableConfigOption.since => 'since',
-    RemovableConfigOption.before => 'before',
+    .status => 'status',
+    .diverged => 'diverged',
+    .sort => 'sort',
+    .local => 'local',
+    .gerrit => 'gerrit',
+    .url => 'url',
+    .dates => 'dates',
+    .since => 'since',
+    .before => 'before',
   };
 }

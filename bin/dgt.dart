@@ -548,6 +548,9 @@ Future<void> main(List<String> arguments) async {
           if (cleanResults.wasParsed('url') && cleanResults.flag('url')) {
             removals.add((option: RemovableConfigOption.url, value: null));
           }
+          if (cleanResults.wasParsed('dates')) {
+            removals.add((option: RemovableConfigOption.dates, value: null));
+          }
           if (cleanResults.wasParsed('diverged') &&
               cleanResults.flag('diverged')) {
             removals.add((option: RemovableConfigOption.diverged, value: null));
